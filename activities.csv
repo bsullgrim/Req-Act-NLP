@@ -1,0 +1,123 @@
+Activity Name
+4.1.4 Store Preform at Target Parameters
+4.1.5 Transfer Preform to Production
+1.1.3 Heat Preform
+1.1.4 Draw Fiber from Preform
+1.1.5 Cool/ Anneal Fiber
+1.1.6 Spool Fiber
+1.1.7 Monitor Fiber Quality
+1.1.8 Correct Defects
+1.1.9 Adjust Production Parameters (Autonomous feedback loop)
+1.2.1 Collect Real-Time Production Data
+1.2.2 Analyze Production Efficiency
+1.2.3 Detect Production Anomalies
+1.2.4 Generate Production Reports
+1.2.5 Transmit Data to Ground Control
+1.3.1 Monitor Microgravity Conditions
+1.3.2 Detect Off-Nominal Microgravity Conditions
+1.3.3 Adjust Manufacturing Parameters for Off-Nominal Conditions
+2.1.1 Inspect System
+2.1.2 Calibrate System
+2.1.3 Detect Faults
+2.1.4 Repair System
+2.1.5 Test System After Repairs
+2.2.1 Generate Solar Power
+2.2.2 Condition Power
+2.2.3 Distribute Power
+2.3.1 Monitor Thermal Environment
+2.3.2 Regulate System Temperature
+2.4.1 Monitor Radiation Levels
+2.4.2 Analyze Radiation Exposure Data
+2.4.3 Adjust Operations for Radiation Protection
+3.1.1 Monitor Safety Standards (Automated safety checks)
+3.1.2 Report Safety Incidents (Automated logging and reporting)
+3.1.3 Implement Policy Changes
+3.2.1 Detect Safety Hazards (Autonomous hazard detection)
+3.2.2 Analyze Safety Data
+3.2.3 Implement Safety Measures (Automated actions to mitigate risk)
+3.3.1 Monitor Orbital Environment for Debris
+3.3.2 Implement Collision Avoidance Maneuvers
+3.3.3 Execute End-of-Life Deorbiting Procedures
+4.1.1 Track Resources (Automated tracking)
+4.1.2 Request Resupply (Autonomous resupply request)
+4.1.3 Receive Resupply
+4.2.1 Schedule Resupply Operations (Automated scheduling)
+4.2.2 Coordinate Resource Transfers (Remote coordination)
+4.2.3 Prepare Fiber for Transport (Automated handling and packaging)
+5.1.1 Initiate System Restarts
+5.1.2 Activate Backup Systems
+5.1.3 Redirect Operations (Reconfiguration after faults)
+5.2.1 Receive Remote Commands
+5.2.2 Execute Remote Overrides
+6.1.1 Capture Sensor Data (Automated and continuous)
+6.1.2 Log System Data
+6.1.3 Store Performance Data
+6.2.1 Evaluate Performance Metrics (Autonomous analysis)
+6.2.2 Identify Performance Bottlenecks
+6.2.3 Generate Optimization Suggestions (Autonomous optimization algorithms)
+7.1.1 Receive and Secure Modules in Orbit
+7.1.2 Prepare for Hardware Installation
+7.1.3 Install Hardware Modules
+7.1.4 Verify Hardware Installation
+7.2.1 Prepare for Software Installation/Update
+7.2.2 Upload Software
+7.2.3 Install/Activate Software
+7.2.4 Verify Software Installation
+8.1.1 Monitor Orbital Parameters
+8.1.2 Calculate Orbital Adjustments
+8.2.1 Execute Orbital Maneuvers
+8.1.3 Monitor Attitude
+8.2.2 Adjust Attitude
+1.1.3.1 Hold Heater
+1.1.3.2 Rotate Heater Stage
+1.1.3.3 Hold Preform
+1.1.6.1 Hold Spool
+1.1.6.2 Level Wind Spool
+1.1.6.3 Measure Tension
+1.2.5.1 Switch Signal Path
+1.2.5.2 Amplify High Rate Transmission
+1.2.5.3 Transmit Low Rate Signal
+1.2.5.4 Amplify Low Rate Transmission
+2.2.4 Transmit Launch Vehicle Power
+2.2.5 Transmit Electrical Power
+2.2.6 Manage Electrical Power
+2.2.7 Rotate Solar Array
+2.2.8 Store Electrical Energy
+2.2.9 Switch Electrical Power
+2.3.3 Transfer Heat Away
+2.3.4 Provide Local Heating
+2.3.5 Radiate Heat
+2.3.6 Insulate System Thermally
+4.2.4 Secure Docking Connection
+4.2.5 Store Manufactured Product
+5.2.1.1 Receive RF Signal
+5.2.1.2 Transmit RF Signal
+6.1.1.1 Measure Temperature
+6.1.1.2 Measure Vibration
+6.1.1.3 Receive GPS Signal
+6.1.1.4 Measure Magnetic Field
+6.1.1.5 Track Stellar Position
+6.1.1.6 Track Sun Position
+7.1.5 Control Antenna Position
+7.1.6 Deploy Antenna
+7.1.7 Provide Structural Surface
+7.1.8 Support Platform Structure
+7.1.9 Rotate Antenna
+8.2.3 Control Attitude Using Reaction Torque
+8.2.4 Store Pressurant
+8.2.5 Transfer Propellant
+8.2.6 Store Propellant
+8.2.7 Regulate Propellant Flow
+1.1.7.1 Measure Fiber Diameter
+1.1.7.2 Detect Defects
+2.1.1.1 Conduct Autonomous Diagnostics
+2.1.1.2 Monitor System Health
+2.1.3.1 Monitor Sensor Data (Remote diagnostics support)
+2.1.3.2 Analyze Faults (Autonomous fault analysis)
+2.1.4.1 Initiate Autonomous Repairs (Remote or autonomous actions)
+2.1.4.2 Coordinate Remote Repair Support (Ground-based intervention)
+2.1.5.1 Autonomous Post-Repair Testing
+2.1.5.2 Remote Monitoring of Repair Testing
+3.1.1.1 Conduct Autonomous Safety Inspections
+4.1.3.1 Coordinate Automated Resource Transfer
+4.1.3.2 Update Inventory
