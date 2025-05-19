@@ -1,88 +1,86 @@
 import pandas as pd
 import spacy
-from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-# Load spaCy medium model (ensure: python -m spacy download en_core_web_md)
-nlp = spacy.load("en_core_web_md")
+# Configuration
+VERB_NOUN_WEIGHT = 0.8  # 60% weight to verb/noun presence
+SEMANTIC_WEIGHT = 0.2   # 40% weight to semantic similarity
+MIN_SIMILARITY = 0.4    # Minimum combined score to consider
+TOP_N = 5               # Max matches per requirement
 
-# Load CSV exports from MagicDraw
-requirements_df = pd.read_csv("requirements.csv")  # Columns: Requirement Name, Requirement Text
-activities_df = pd.read_csv("activities.csv")      # Columns: Activity Name
+# Load spaCy transformer model
+nlp = spacy.load("en_core_web_trf")
 
-# Clean up missing values
-requirements_df["Requirement Text"] = requirements_df["Requirement Text"].fillna("")
-activities_df["Activity Name"] = activities_df["Activity Name"].fillna("")
+def trf_similarity(doc1, doc2):
+    # Get the last hidden layer state and convert to numpy
+    vec1 = doc1._.trf_data.last_hidden_layer_state.data.mean(axis=0)
+    vec2 = doc2._.trf_data.last_hidden_layer_state.data.mean(axis=0)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return float(np.dot(vec1, vec2) / (norm1 * norm2))
 
-def extract_verb_noun(doc):
-    verb = None
-    nouns = []
-    # Simple heuristic: first VERB lemma, plus all NOUN/PROPN lemmas
-    for token in doc:
-        if verb is None and token.pos_ == "VERB":
-            verb = token.lemma_
-        if token.pos_ in ("NOUN", "PROPN"):
-            nouns.append(token.lemma_)
-    noun_phrase = " ".join(nouns)
-    return verb, noun_phrase
 
-# Preprocess activities: extract verb, noun phrase, and vector of noun phrase
-activity_data = []
+# Load data
+requirements_df = pd.read_csv("requirements.csv").fillna({"Requirement Text": ""})
+activities_df = pd.read_csv("activities.csv").fillna({"Activity Name": ""})
+
+# Extract verbs/nouns from activities
+def extract_action_parts(text):
+    doc = nlp(text)
+    verbs = [token.lemma_.lower() for token in doc if token.pos_ == "VERB"]
+    nouns = [token.lemma_.lower() for token in doc if token.pos_ in ("NOUN", "PROPN")]
+    return verbs, nouns
+
+activities_df[["Verbs", "Nouns"]] = activities_df["Activity Name"].apply(
+    lambda x: pd.Series(extract_action_parts(x))
+)
+
+# Precompute activity docs
 activity_docs = list(nlp.pipe(activities_df["Activity Name"]))
-for i, doc in enumerate(activity_docs):
-    verb, noun_phrase = extract_verb_noun(doc)
-    # Vectorize noun phrase (fallback to zero vector if empty)
-    vec = nlp(noun_phrase).vector if noun_phrase else np.zeros((nlp.vocab.vectors_length,))
-    activity_data.append({
-        "Activity Name": activities_df.iloc[i]["Activity Name"],
-        "Verb": verb,
-        "Noun Phrase": noun_phrase,
-        "Vector": vec
-    })
-
-TOP_N = 3  # Number of top matches per requirement
 
 matches = []
-requirement_docs = list(nlp.pipe(requirements_df["Requirement Text"]))
+for req_idx, req_row in requirements_df.iterrows():
+    req_text = req_row["Requirement Text"]
+    req_doc = nlp(req_text)
+    req_lemmas = {token.lemma_.lower() for token in req_doc}
+    scores = []
+    for act_idx, (act_name, act_verbs, act_nouns) in enumerate(zip(
+        activities_df["Activity Name"],
+        activities_df["Verbs"],
+        activities_df["Nouns"]
+    )):
+        # Verb/Noun Matching Score (0-1)
+        verb_score = sum(1 for v in act_verbs if v in req_lemmas) / max(1, len(act_verbs))
+        noun_score = sum(1 for n in act_nouns if n in req_lemmas) / max(1, len(act_nouns))
+        vn_score = (verb_score + noun_score) / 2
 
-for i, r_doc in enumerate(requirement_docs):
-    r_verb, r_noun_phrase = extract_verb_noun(r_doc)
-    if not r_verb:
-        # Skip requirements with no verb (optional)
-        continue
-    r_vec = nlp(r_noun_phrase).vector if r_noun_phrase else np.zeros((nlp.vocab.vectors_length,))
+        # Semantic Similarity Score (0-1)
+        sim_score = trf_similarity(req_doc, activity_docs[act_idx])
 
-    # Filter activities to those with matching verb
-    candidates = [a for a in activity_data if a["Verb"] == r_verb]
+        # Combined Score
+        combined_score = (vn_score * VERB_NOUN_WEIGHT) + (sim_score * SEMANTIC_WEIGHT)
 
-    if not candidates:
-        # No verb match, fallback to all activities or skip
-        candidates = activity_data
+        if combined_score >= MIN_SIMILARITY:
+            scores.append((combined_score, act_idx, vn_score, sim_score))
 
-    # Calculate cosine similarity of noun phrases
-    sims = []
-    for a in candidates:
-        if np.linalg.norm(r_vec) > 0 and np.linalg.norm(a["Vector"]) > 0:
-            sim = cosine_similarity(r_vec.reshape(1, -1), a["Vector"].reshape(1, -1))[0][0]
-        else:
-            sim = 0.0
-        sims.append((a["Activity Name"], sim))
-
-    sims = sorted(sims, key=lambda x: x[1], reverse=True)[:TOP_N]
-
-    for act_name, sim_score in sims:
+    # Sort and keep top N
+    for score, act_idx, vn_score, sim_score in sorted(scores, reverse=True)[:TOP_N]:
         matches.append({
-            "Requirement Name": requirements_df.iloc[i]["Requirement Name"],
-            "Requirement Text": requirements_df.iloc[i]["Requirement Text"],
-            "Requirement Verb": r_verb,
-            "Requirement Noun Phrase": r_noun_phrase,
-            "Activity Name": act_name,
-            "Similarity Score": round(sim_score, 3)
+            "Requirement ID": req_row["Requirement Name"],
+            "Requirement Text": req_text,
+            "Activity Name": activities_df.iloc[act_idx]["Activity Name"],
+            "Activity Verbs": ", ".join(activities_df.iloc[act_idx]["Verbs"]),
+            "Activity Nouns": ", ".join(activities_df.iloc[act_idx]["Nouns"]),
+            "VerbNoun Score": round(vn_score, 3),
+            "Similarity Score": round(sim_score, 3),
+            "Combined Score": round(score, 3)
         })
 
+# Save results
 matches_df = pd.DataFrame(matches)
+matches_df.to_csv("hybrid_matches_trf.csv", index=False)
+matches_df.to_excel("hybrid_matches_trf.xlsx", index=False, engine="openpyxl")
 
-matches_df.to_csv("req_to_activity_matches.csv", index=False, encoding="utf-8")
-matches_df.to_excel("req_to_activity_matches.xlsx", index=False, engine="openpyxl")
-
-print("Done! See req_to_activity_matches.csv and req_to_activity_matches.xlsx for your results.")
+print(f"Generated {len(matches)} matches. Results saved to hybrid_matches_trf.csv and .xlsx")
