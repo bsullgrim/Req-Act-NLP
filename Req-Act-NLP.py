@@ -68,7 +68,8 @@ for req_idx, req_row in requirements_df.iterrows():
     # Sort and keep top N
     for score, act_idx, vn_score, sim_score in sorted(scores, reverse=True)[:TOP_N]:
         matches.append({
-            "Requirement ID": req_row["Requirement Name"],
+            "Requirement ID": req_row["ID"],
+            "Requirement Name": req_row["Requirement Name"],
             "Requirement Text": req_text,
             "Activity Name": activities_df.iloc[act_idx]["Activity Name"],
             "Activity Verbs": ", ".join(activities_df.iloc[act_idx]["Verbs"]),
