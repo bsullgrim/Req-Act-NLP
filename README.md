@@ -8,7 +8,7 @@ It is designed for traceability and explainability in engineering, aerospace, an
 
 ---
 
-## General Overview (For Non-Python Users)
+## General Overview
 
 **Purpose:**  
 Automatically link requirements to the most relevant activities, combining both explicit word matching and deep semantic language understanding.
@@ -22,29 +22,47 @@ Automatically link requirements to the most relevant activities, combining both 
 - `hybrid_matches_trf.xlsx`
 
 **What you get:**  
-For each requirement, a ranked list of activities with scores showing how well each activity matches, based on both explicit verb/noun overlap and semantic similarity.
+For each requirement, a ranked list of activities with scores showing how well each activity matches, based on both explicit verb/noun overlap and semantic similarity. The requirement ID is preserved in the output for traceability.
 
 ---
 
 ## Quick Start
 
-1. **Install Python 3.8+** (recommended).
-2. **Install dependencies:**  
+### 1. Install Anaconda  
+Download and install the [Anaconda Individual Edition](https://www.anaconda.com/products/distribution) from the official site.
+
+### 2. Create and Activate a New Environment  
+(Optional but recommended for isolation.)
+```bash
+conda create -n reqmatch python=3.12
+conda activate reqmatch
+```
+### 3. **Install dependencies:**  
    Open a terminal and run:
    ```
-   pip install pandas spacy openpyxl numpy
+   conda install pandas numpy openpyxl spacy
    python -m spacy download en_core_web_trf
    ```
-3. **Place your `requirements.csv` and `activities.csv` in the same folder as the script.**
-4. **Run the script:**
+### 4. Prepare Input Files
+Place your requirements.csv and activities.csv in the same folder as the script.
+
+    requirements.csv must include: ID, Requirement Name, Requirement Text
+
+    activities.csv must include: Activity Name
+### 5. **Run the script:**
    ```
    python Req-Act-NLP.py
    ```
-5. **Open the output files (`hybrid_matches_trf.csv` or `.xlsx`) in Excel or your preferred tool.**
+### 6. Review the Output
 
+Results are written to:
+
+    hybrid_matches_trf.csv
+
+    hybrid_matches_trf.xlsx
 ---
 
-## How It Works (For Python Professionals)
+## How It Works 
 
 ### Libraries Used
 
