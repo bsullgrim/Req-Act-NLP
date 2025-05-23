@@ -23,7 +23,7 @@ def run_matcher(vn_weight, sem_weight, min_sim, top_n, out_file="hybrid_matches_
 
 
     # Load data
-    requirements_df = pd.read_csv("requirements.csv", encoding="latin1").fillna({"Requirement Text": ""})
+    requirements_df = pd.read_csv("requirements.csv").fillna({"Requirement Text": ""})
     activities_df = pd.read_csv("activities.csv").fillna({"Activity Name": ""})
 
     # Extract verbs/nouns from activities
@@ -91,4 +91,4 @@ def run_matcher(vn_weight, sem_weight, min_sim, top_n, out_file="hybrid_matches_
 
 if __name__ == "__main__":
     # Call the matcher with your parameters here:
-    run_matcher(vn_weight=0.5, sem_weight=0.5, min_sim=0.4, top_n=5)
+    run_matcher(vn_weight=0.3, sem_weight=0.7, min_sim=0.4, top_n=5)
