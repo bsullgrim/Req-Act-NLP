@@ -8,7 +8,7 @@ It is designed for traceability and explainability in engineering, aerospace, an
 
 ---
 
-## General Overview
+## matcher.py Overview
 
 **Purpose:**  
 Automatically link requirements to the most relevant activities, combining both explicit word matching and deep semantic language understanding.
@@ -23,76 +23,6 @@ Automatically link requirements to the most relevant activities, combining both 
 
 **What you get:**  
 For each requirement, a ranked list of activities with scores showing how well each activity matches, based on both explicit verb/noun overlap and semantic similarity. The requirement ID is preserved in the output for traceability.
-
-## evaluator.py
-
-The `evaluator.py` script provides a comprehensive evaluation framework to assess the performance of automated activity matching systems by comparing predicted matches against a manually curated reference. The main function, `evaluator_with_prf`, calculates various metrics to evaluate matching accuracy, including precision, recall, F1 score, top-N accuracy, and Mean Reciprocal Rank (MRR).
-
-### Key Functionalities:
-
-- **File Inputs**:
-  - `manual_file`: Path to a CSV file containing the manually matched activities (`manual_matches.csv` by default).
-  - `auto_file`: Path to a CSV file containing the automatically generated matches (`hybrid_matches_trf.csv` by default).
-
-- **Preprocessing**:
-  - Loads and normalizes activity names to lowercase and strips any context markers to ensure consistent matching.
-  - Groups automatic matches by requirement ID and extracts the top-N highest scoring predictions.
-
-- **Evaluation Metrics**:
-  - **Top-N Accuracy**: Measures whether any of the manually matched activities appear in the top-N predictions.
-  - **Top-1 Accuracy**: Measures whether the top prediction exactly matches the first manual match.
-  - **Precision, Recall, F1 Score**: Computed per row and averaged across all examples.
-  - **MRR (Mean Reciprocal Rank)**: Evaluates how high the first correct match appears in the predicted ranking.
-
-- **Outputs**:
-  - A summary dictionary with all computed metrics.
-  - A DataFrame with detailed evaluation results per requirement.
-  - Prints performance statistics to the console.
-  - Displays up to 10 examples where the automated matcher failed to include the correct result in the top-N list.
-
-- **Robustness**:
-  - Gracefully handles missing or empty input files.
-  - Applies defensive programming techniques to avoid crashing on malformed data.
-
-This script is intended to be executed as a standalone module, providing immediate feedback on matching model performance.
-
-## evaluator.py
-
-The `evaluator.py` script provides a comprehensive evaluation framework to assess the performance of automated activity matching systems by comparing predicted matches against a manually curated reference. The main function, `evaluator_with_prf`, calculates various metrics to evaluate matching accuracy, including precision, recall, F1 score, top-N accuracy, and Mean Reciprocal Rank (MRR).
-
-### Key Functionalities:
-
-- **File Inputs**:
-  - `manual_file`: Path to a CSV file containing the manually matched activities (`manual_matches.csv` by default).
-  - `auto_file`: Path to a CSV file containing the automatically generated matches (`hybrid_matches_trf.csv` by default).
-
-- **Preprocessing**:
-  - Loads and normalizes activity names to lowercase and strips any context markers to ensure consistent matching.
-  - Groups automatic matches by requirement ID and extracts the top-N highest scoring predictions.
-
-- **Evaluation Metrics**:
-  - **Top-N Accuracy**: Measures whether any of the manually matched activities appear in the top-N predictions.
-  - **Top-1 Accuracy**: Measures whether the top prediction exactly matches the first manual match.
-  - **Precision, Recall, F1 Score**: Computed per row and averaged across all examples.
-  - **MRR (Mean Reciprocal Rank)**: Evaluates how high the first correct match appears in the predicted ranking.
-
-- **Outputs**:
-  - A summary dictionary with all computed metrics.
-  - A DataFrame with detailed evaluation results per requirement.
-  - Prints performance statistics to the console.
-  - Displays up to 10 examples where the automated matcher failed to include the correct result in the top-N list.
-
-- **Robustness**:
-  - Gracefully handles missing or empty input files.
-  - Applies defensive programming techniques to avoid crashing on malformed data.
-
-This script is intended to be executed as a standalone module, providing immediate feedback on matching model performance.
-
----
-
-## grid_search.py
-
-The `grid_search.py` script automates the process of hyperparameter tuning for the matching system by running multiple combinations of vector-based and semantic similarity weights, similarity thresholds, and top-N values. It leverages the `run_matcher` and `evaluator_with_prf` functions from the `matcher` and `evaluator` modules, respectively.
 
 ### Key Functionalities:
 
@@ -141,7 +71,7 @@ Place your requirements.csv and activities.csv in the same folder as the script.
     activities.csv must include: Activity Name
 ### 5. **Run the script:**
    ```
-   python Req-Act-NLP.py
+   python matcher.py
    ```
 ### 6. Review the Output
 
@@ -229,6 +159,43 @@ Results are written to:
 
 ---
 
+## evaluator.py
+
+The `evaluator.py` script provides a comprehensive evaluation framework to assess the performance of automated activity matching systems by comparing predicted matches against a manually curated reference. The main function, `evaluator_with_prf`, calculates various metrics to evaluate matching accuracy, including precision, recall, F1 score, top-N accuracy, and Mean Reciprocal Rank (MRR).
+
+### Key Functionalities:
+
+- **File Inputs**:
+  - `manual_file`: Path to a CSV file containing the manually matched activities (`manual_matches.csv` by default).
+  - `auto_file`: Path to a CSV file containing the automatically generated matches (`hybrid_matches_trf.csv` by default).
+
+- **Preprocessing**:
+  - Loads and normalizes activity names to lowercase and strips any context markers to ensure consistent matching.
+  - Groups automatic matches by requirement ID and extracts the top-N highest scoring predictions.
+
+- **Evaluation Metrics**:
+  - **Top-N Accuracy**: Measures whether any of the manually matched activities appear in the top-N predictions.
+  - **Top-1 Accuracy**: Measures whether the top prediction exactly matches the first manual match.
+  - **Precision, Recall, F1 Score**: Computed per row and averaged across all examples.
+  - **MRR (Mean Reciprocal Rank)**: Evaluates how high the first correct match appears in the predicted ranking.
+
+- **Outputs**:
+  - A summary dictionary with all computed metrics.
+  - A DataFrame with detailed evaluation results per requirement.
+  - Prints performance statistics to the console.
+  - Displays up to 10 examples where the automated matcher failed to include the correct result in the top-N list.
+
+- **Robustness**:
+  - Gracefully handles missing or empty input files.
+  - Applies defensive programming techniques to avoid crashing on malformed data.
+
+This script is intended to be executed as a standalone module, providing immediate feedback on matching model performance.
+
+---
+
+## grid_search.py
+
+The `grid_search.py` script automates the process of hyperparameter tuning for the matching system by running multiple combinations of vector-based and semantic similarity weights, similarity thresholds, and top-N values. It leverages the `run_matcher` and `evaluator_with_prf` functions from the `matcher` and `evaluator` modules, respectively.
 
 ## References
 
