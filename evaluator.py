@@ -40,7 +40,20 @@ class MatchingEvaluator:
             
             # Normalize and expand Satisfied By
             def normalize_activity_name(name):
-                return re.sub(r'\(context.*?\)', '', name, flags=re.IGNORECASE).strip().lower()
+                """
+                Normalizes an activity name by:
+                1. Removing leading step numbers like "1 ", "2. ", "03 - ", "4) ", etc.
+                2. Removing any '(context...)' substring (case-insensitive)
+                3. Stripping whitespace and converting to lowercase
+                """
+                # Step 1: Remove leading step numbers (e.g. "1 ", "2. ", "03 - ", "4) ")
+                #name = re.sub(r"^\s*\d+[\.\-\)]*\s*", "", name)
+
+                # Step 2: Remove anything like "(context blah)" regardless of case
+                name = re.sub(r'\(context.*?\)', '', name, flags=re.IGNORECASE)
+
+                # Step 3: Trim and lowercase
+                return name.strip().lower()
             
             ground_truth = defaultdict(list)
             for _, row in df.iterrows():

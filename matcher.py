@@ -401,7 +401,7 @@ class TheoreticallyEnhancedMatcher:
             if req_idx % 10 == 0:
                 logger.info(f"Processing requirement {req_idx + 1}/{total_reqs}")
             
-            req_text = getattr(req_row, 'Requirement_Text', '') or getattr(req_row, '_2', '')
+            req_text = getattr(req_row, 'Requirement Text', '') or getattr(req_row, '_3', '')
             if not req_text or not str(req_text).strip():
                 continue
             
@@ -436,7 +436,7 @@ class TheoreticallyEnhancedMatcher:
             for candidate in candidate_scores[:top_n]:
                 matches.append({
                     "ID": getattr(req_row, 'ID', None) or getattr(req_row, '_1', req_idx),
-                    "Requirement Name": getattr(req_row, 'Requirement_Name', None) or getattr(req_row, '_2', f"Req_{req_idx}"),
+                    "Requirement Name": getattr(req_row, 'Requirement Name', None) or getattr(req_row, '_2', f"Req_{req_idx}"),
                     "Requirement Text": req_text,
                     "Activity Name": candidate['act_name'],
                     "Combined Score": round(candidate['combined_score'], 3),
