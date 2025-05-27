@@ -1,0 +1,218 @@
+ID,Requirement Name,Requirement Text,Activity Name,Combined Score,Dense Semantic,BM25 Score,Syntactic Score,Domain Weighted,Query Expansion
+P.9,P.9 Thermal Precision,P.9 Thermal Precision,2.3.2 Regulate System Temperature,2.501,0.507,5.853,0.168,0.169,0.0
+P.9,P.9 Thermal Precision,P.9 Thermal Precision,6.1.1.1 Measure Temperature,2.476,0.414,5.948,0.084,0.007,0.0
+P.9,P.9 Thermal Precision,P.9 Thermal Precision,2.2.2 Condition Power,2.102,0.426,5.006,0.084,0.011,0.0
+P.8,P.8 Energy Efficiency,P.8 Energy Efficiency,2.2.8 Store Electrical Energy,2.458,0.415,5.912,0.062,0.004,0.0
+P.8,P.8 Energy Efficiency,P.8 Energy Efficiency,1.2.2 Analyze Production Efficiency,2.299,0.437,5.447,0.209,0.005,0.0
+P.8,P.8 Energy Efficiency,P.8 Energy Efficiency,2.2.3 Distribute Power,1.747,0.375,4.119,0.133,0.023,0.0
+P.7,P.7 Quality Consistency,P.7 Quality Consistency,6.2.1 Evaluate Performance Metrics (Autonomous analysis),2.176,0.545,5.06,0.282,0.004,0.0
+P.7,P.7 Quality Consistency,P.7 Quality Consistency,1.1.7 Monitor Fiber Quality,1.811,0.484,4.205,0.19,0.018,0.0
+P.7,P.7 Quality Consistency,P.7 Quality Consistency,4.2.5 Store Manufactured Product,1.56,0.462,3.652,0.019,0.022,0.0
+P.6,P.6 Production Continuity,P.6 Production Continuity,1.1.7 Monitor Fiber Quality,2.833,0.458,6.788,0.1,0.054,0.0
+P.6,P.6 Production Continuity,P.6 Production Continuity,5.1.1 Initiate System Restarts,2.462,0.436,5.853,0.061,0.122,0.0
+P.6,P.6 Production Continuity,P.6 Production Continuity,4.1.5 Transfer Preform to Production,1.427,0.535,3.245,0.114,0.028,0.0
+P.5,P.5 Competitive Pricing,P.5 Competitive Pricing,4.2.5 Store Manufactured Product,3.243,0.417,7.857,0.087,0.016,0.0
+P.5,P.5 Competitive Pricing,P.5 Competitive Pricing,4.1.4 Store Preform at Target Parameters,2.139,0.555,5.025,0.118,0.004,0.0
+P.5,P.5 Competitive Pricing,P.5 Competitive Pricing,6.2.2 Identify Performance Bottlenecks,1.81,0.516,4.205,0.15,0.012,0.0
+P.4,P.4 Commercial Viability,P.4 Commercial Viability,7.1.8 Support Platform Structure,1.758,0.505,4.047,0.247,0.005,0.0
+P.4,P.4 Commercial Viability,P.4 Commercial Viability,6.2.1 Evaluate Performance Metrics (Autonomous analysis),1.682,0.598,3.752,0.398,0.009,0.0
+P.4,P.4 Commercial Viability,P.4 Commercial Viability,2.1.3.2 Analyze Faults (Autonomous fault analysis),1.672,0.59,3.752,0.344,0.009,0.0
+P.3,P.3 Manufacturing Yield,P.3 Manufacturing Yield,1.3.3 Adjust Manufacturing Parameters for Off-Nominal Conditions,1.433,0.604,3.126,0.339,0.054,0.0
+P.3,P.3 Manufacturing Yield,P.3 Manufacturing Yield,1.1.5 Cool/ Anneal Fiber,1.275,0.573,2.82,0.07,0.108,0.0
+P.3,P.3 Manufacturing Yield,P.3 Manufacturing Yield,1.1.6 Spool Fiber,1.262,0.49,2.82,0.096,0.108,0.0
+P.2,P.2 Production Rate,P.2 Production Rate,1.2.5.4 Amplify Low Rate Transmission,1.683,0.518,3.879,0.168,0.012,0.0
+P.2,P.2 Production Rate,P.2 Production Rate,1.2.5.2 Amplify High Rate Transmission,1.682,0.513,3.879,0.168,0.012,0.0
+P.2,P.2 Production Rate,P.2 Production Rate,1.2.5.3 Transmit Low Rate Signal,1.679,0.496,3.879,0.168,0.012,0.0
+P.1,P.1 Fiber Quality,P.1 Fiber Quality,1.2.5.4 Amplify Low Rate Transmission,3.705,0.595,8.904,0.136,0.022,0.0
+P.1,P.1 Fiber Quality,P.1 Fiber Quality,1.2.5.3 Transmit Low Rate Signal,3.701,0.576,8.904,0.136,0.022,0.0
+P.1,P.1 Fiber Quality,P.1 Fiber Quality,1.2.5.2 Amplify High Rate Transmission,1.695,0.593,3.879,0.136,0.022,0.0
+O.23,O.23 Microgravity Disturbance Response,O.23 Microgravity Disturbance Response,1.3.2 Detect Off-Nominal Microgravity Conditions,3.45,0.576,8.271,0.148,0.017,0.0
+O.23,O.23 Microgravity Disturbance Response,O.23 Microgravity Disturbance Response,1.1.7.2 Detect Defects,2.02,0.438,4.785,0.119,0.0,0.0
+O.23,O.23 Microgravity Disturbance Response,O.23 Microgravity Disturbance Response,2.1.3 Detect Faults,2.017,0.425,4.785,0.119,0.0,0.0
+O.22,O.22 Fiber Spool Management,O.22 Fiber Spool Management,6.1.1 Capture Sensor Data (Automated and continuous),2.002,0.608,4.663,0.1,0.0,0.0
+O.22,O.22 Fiber Spool Management,O.22 Fiber Spool Management,4.1.1 Track Resources (Automated tracking),1.749,0.567,4.043,0.12,0.0,0.0
+O.22,O.22 Fiber Spool Management,O.22 Fiber Spool Management,4.1.3.1 Coordinate Automated Resource Transfer,1.734,0.52,4.043,0.088,0.0,0.0
+O.21,O.21 Microgravity Optimization,O.21 Microgravity Optimization,1.3.1 Monitor Microgravity Conditions,1.978,0.582,4.585,0.167,0.014,0.0
+O.21,O.21 Microgravity Optimization,O.21 Microgravity Optimization,2.3.1 Monitor Thermal Environment,1.971,0.549,4.585,0.167,0.011,0.0
+O.21,O.21 Microgravity Optimization,O.21 Microgravity Optimization,1.3.2 Detect Off-Nominal Microgravity Conditions,1.861,0.661,4.229,0.23,0.014,0.0
+O.20,O.20 Thermal Management,O.20 Thermal Management,2.2.2 Condition Power,2.071,0.326,5.006,0.0,0.016,0.0
+O.20,O.20 Thermal Management,O.20 Thermal Management,2.3.1 Monitor Thermal Environment,2.038,0.406,4.819,0.196,0.0,0.0
+O.20,O.20 Thermal Management,O.20 Thermal Management,1.3.1 Monitor Microgravity Conditions,1.943,0.445,4.585,0.11,0.016,0.0
+O.19,O.19 Fault Tolerance,O.19 Fault Tolerance,2.1.3.2 Analyze Faults (Autonomous fault analysis),4.017,0.556,9.708,0.131,0.014,0.0
+O.19,O.19 Fault Tolerance,O.19 Fault Tolerance,6.2.1 Evaluate Performance Metrics (Autonomous analysis),3.087,0.583,7.351,0.179,0.017,0.0
+O.19,O.19 Fault Tolerance,O.19 Fault Tolerance,2.1.3 Detect Faults,2.317,0.39,5.567,0.076,0.006,0.0
+O.18,O.18 Crew Safety,O.18 Crew Safety,3.1.1 Monitor Safety Standards (Automated safety checks),1.985,0.495,4.683,0.064,0.016,0.0
+O.18,O.18 Crew Safety,O.18 Crew Safety,3.2.2 Analyze Safety Data,1.799,0.418,4.205,0.196,0.016,0.0
+O.18,O.18 Crew Safety,O.18 Crew Safety,3.1.1.1 Conduct Autonomous Safety Inspections,1.657,0.398,3.879,0.153,0.016,0.0
+O.17,O.17 Supply Chain Management,O.17 Supply Chain Management,4.2.1 Schedule Resupply Operations (Automated scheduling),3.291,0.552,7.917,0.075,0.014,0.0
+O.17,O.17 Supply Chain Management,O.17 Supply Chain Management,6.1.3 Store Performance Data,3.089,0.484,7.45,0.056,0.02,0.0
+O.17,O.17 Supply Chain Management,O.17 Supply Chain Management,6.2.1 Evaluate Performance Metrics (Autonomous analysis),3.081,0.555,7.351,0.179,0.013,0.0
+O.16,O.16 Launch Operations,O.16 Launch Operations,2.2.4 Transmit Launch Vehicle Power,4.013,0.478,9.728,0.158,0.012,0.0
+O.16,O.16 Launch Operations,O.16 Launch Operations,3.3.3 Execute End-of-Life Deorbiting Procedures,2.017,0.612,4.663,0.193,0.004,0.0
+O.16,O.16 Launch Operations,O.16 Launch Operations,5.1.3 Redirect Operations (Reconfiguration after faults),1.375,0.594,3.078,0.137,0.02,0.0
+O.15,O.15 Radiation Protection,O.15 Radiation Protection,2.4.1 Monitor Radiation Levels,2.04,0.442,4.819,0.148,0.011,0.0
+O.15,O.15 Radiation Protection,O.15 Radiation Protection,2.4.2 Analyze Radiation Exposure Data,1.905,0.513,4.445,0.148,0.011,0.0
+O.15,O.15 Radiation Protection,O.15 Radiation Protection,2.4.3 Adjust Operations for Radiation Protection,1.9,0.49,4.445,0.143,0.011,0.0
+O.14,O.14 Process Versatility,O.14 Process Versatility,4.2.5 Store Manufactured Product,1.575,0.472,3.652,0.1,0.026,0.0
+O.14,O.14 Process Versatility,O.14 Process Versatility,2.1.5 Test System After Repairs,0.345,0.589,0.405,0.172,0.195,0.0
+O.14,O.14 Process Versatility,O.14 Process Versatility,2.3.2 Regulate System Temperature,0.318,0.478,0.405,0.14,0.195,0.0
+O.13,O.13 Automation,O.13 Automation,1.2.1 Collect Real-Time Production Data,2.813,0.518,6.702,0.132,0.043,0.0
+O.13,O.13 Automation,O.13 Automation,5.1.1 Initiate System Restarts,2.459,0.405,5.853,0.064,0.139,0.0
+O.13,O.13 Automation,O.13 Automation,4.1.5 Transfer Preform to Production,1.43,0.526,3.245,0.137,0.032,0.0
+O.12,O.12 Production Ramping,O.12 Production Ramping,1.1.4 Draw Fiber from Preform,3.345,0.53,8.03,0.123,0.043,0.0
+O.12,O.12 Production Ramping,O.12 Production Ramping,2.4.1 Monitor Radiation Levels,2.041,0.477,4.819,0.109,0.008,0.0
+O.12,O.12 Production Ramping,O.12 Production Ramping,1.1.6.2 Level Wind Spool,2.039,0.498,4.819,0.07,0.008,0.0
+O.11,O.11 Scalable Production,O.11 Scalable Production,4.2.4 Secure Docking Connection,2.5,0.557,5.912,0.158,0.003,0.0
+O.11,O.11 Scalable Production,O.11 Scalable Production,7.1.3 Install Hardware Modules,2.314,0.525,5.447,0.197,0.002,0.0
+O.11,O.11 Scalable Production,O.11 Scalable Production,2.1.5.1 Autonomous Post-Repair Testing,2.303,0.514,5.453,0.124,0.001,0.0
+O.10,O.10 Upgradable Technologies,O.10 Upgradable Technologies,7.1.4 Verify Hardware Installation,3.553,0.455,8.534,0.316,0.004,0.0
+O.10,O.10 Upgradable Technologies,O.10 Upgradable Technologies,7.2.4 Verify Software Installation,3.346,0.443,8.02,0.316,0.008,0.0
+O.10,O.10 Upgradable Technologies,O.10 Upgradable Technologies,2.1.5 Test System After Repairs,2.27,0.581,5.224,0.293,0.103,0.0
+O.9,O.9 User-Friendly Interfaces,O.9 User-Friendly Interfaces,1.2.5 Transmit Data to Ground Control,4.905,0.539,11.951,0.085,0.02,0.0
+O.9,O.9 User-Friendly Interfaces,O.9 User-Friendly Interfaces,4.1.1 Track Resources (Automated tracking),2.306,0.585,5.453,0.048,0.001,0.0
+O.9,O.9 User-Friendly Interfaces,O.9 User-Friendly Interfaces,2.1.5 Test System After Repairs,2.231,0.585,5.224,0.073,0.064,0.0
+O.8,O.8 Standardized Data Formats,O.8 Standardized Data Formats,1.2.5 Transmit Data to Ground Control,3.57,0.485,8.582,0.238,0.024,0.0
+O.8,O.8 Standardized Data Formats,O.8 Standardized Data Formats,1.3.3 Adjust Manufacturing Parameters for Off-Nominal Conditions,1.41,0.552,3.126,0.303,0.018,0.0
+O.8,O.8 Standardized Data Formats,O.8 Standardized Data Formats,5.1.3 Redirect Operations (Reconfiguration after faults),1.381,0.607,3.078,0.16,0.02,0.0
+O.7,O.7 Data Distribution,O.7 Data Distribution,7.1.8 Support Platform Structure,3.478,0.486,8.43,0.047,0.009,0.0
+O.7,O.7 Data Distribution,O.7 Data Distribution,6.1.3 Store Performance Data,3.093,0.506,7.45,0.058,0.017,0.0
+O.7,O.7 Data Distribution,O.7 Data Distribution,2.1.4.2 Coordinate Remote Repair Support (Ground-based intervention),2.597,0.593,6.175,0.044,0.009,0.0
+O.6,O.6 Environmental Survivability,O.6 Environmental Survivability,2.3.1 Monitor Thermal Environment,3.882,0.475,9.403,0.151,0.013,0.0
+O.6,O.6 Environmental Survivability,O.6 Environmental Survivability,2.4.1 Monitor Radiation Levels,2.049,0.466,4.819,0.171,0.013,0.0
+O.6,O.6 Environmental Survivability,O.6 Environmental Survivability,2.4.2 Analyze Radiation Exposure Data,1.913,0.533,4.445,0.171,0.013,0.0
+O.5,O.5 Operational Availability,O.5 Operational Availability,3.3.3 Execute End-of-Life Deorbiting Procedures,1.909,0.625,4.364,0.233,0.019,0.0
+O.5,O.5 Operational Availability,O.5 Operational Availability,2.1.5 Test System After Repairs,0.347,0.556,0.405,0.164,0.243,0.0
+O.5,O.5 Operational Availability,O.5 Operational Availability,2.3.2 Regulate System Temperature,0.337,0.486,0.405,0.191,0.243,0.0
+O.4,O.4 Command and Control,O.4 Command and Control,5.2.1 Receive Remote Commands,2.152,0.466,5.099,0.123,0.005,0.0
+O.4,O.4 Command and Control,O.4 Command and Control,4.2.4 Secure Docking Connection,1.953,0.533,4.585,0.085,0.0,0.0
+O.4,O.4 Command and Control,O.4 Command and Control,7.1.7 Provide Structural Surface,1.869,0.487,4.383,0.123,0.0,0.0
+O.3,O.3 Safe Return,O.3 Safe Return,4.2.5 Store Manufactured Product,1.778,0.455,4.205,0.031,0.0,0.0
+O.3,O.3 Safe Return,O.3 Safe Return,1.1.5 Cool/ Anneal Fiber,1.246,0.488,2.82,0.051,0.065,0.0
+O.3,O.3 Safe Return,O.3 Safe Return,1.1.6 Spool Fiber,1.232,0.457,2.82,0.0,0.065,0.0
+O.2,O.2 Continuous Operation,O.2 Continuous Operation,2.3.1 Monitor Thermal Environment,1.945,0.436,4.585,0.152,0.009,0.0
+O.2,O.2 Continuous Operation,O.2 Continuous Operation,2.1.4.2 Coordinate Remote Repair Support (Ground-based intervention),1.881,0.524,4.423,0.039,0.003,0.0
+O.2,O.2 Continuous Operation,O.2 Continuous Operation,3.3.1 Monitor Orbital Environment for Debris,1.834,0.548,4.229,0.205,0.009,0.0
+O.1,O.1 High-Quality Production,O.1 High-Quality Production,1.1.7.2 Detect Defects,2.377,0.52,5.567,0.3,0.006,0.0
+O.1,O.1 High-Quality Production,O.1 High-Quality Production,1.1.8 Correct Defects,2.36,0.512,5.567,0.2,0.006,0.0
+O.1,O.1 High-Quality Production,O.1 High-Quality Production,1.3.1 Monitor Microgravity Conditions,2.008,0.581,4.585,0.369,0.012,0.0
+I.11,I.11 Product Return Interface,I.11 Product Return Interface,4.2.3 Prepare Fiber for Transport (Automated handling and packaging),2.873,0.649,6.783,0.144,0.043,0.0
+I.11,I.11 Product Return Interface,I.11 Product Return Interface,4.2.4 Secure Docking Connection,1.955,0.542,4.585,0.088,0.0,0.0
+I.11,I.11 Product Return Interface,I.11 Product Return Interface,7.1.1 Receive and Secure Modules in Orbit,1.813,0.531,4.229,0.103,0.0,0.0
+I.10,I.10 Raw Material Interface,I.10 Raw Material Interface,4.1.2 Request Resupply (Autonomous resupply request),2.411,0.68,5.629,0.129,0.019,0.0
+I.10,I.10 Raw Material Interface,I.10 Raw Material Interface,4.1.3 Receive Resupply,2.219,0.485,5.261,0.089,0.019,0.0
+I.10,I.10 Raw Material Interface,I.10 Raw Material Interface,4.2.1 Schedule Resupply Operations (Automated scheduling),1.771,0.55,4.125,0.047,0.019,0.0
+I.9,I.9 Maintenance Interface,I.9 Maintenance Interface,2.3.4 Provide Local Heating,1.86,0.406,4.383,0.171,0.0,0.0
+I.9,I.9 Maintenance Interface,I.9 Maintenance Interface,7.1.7 Provide Structural Surface,1.86,0.406,4.383,0.171,0.0,0.0
+I.9,I.9 Maintenance Interface,I.9 Maintenance Interface,2.1.5 Test System After Repairs,0.343,0.543,0.405,0.158,0.243,0.0
+I.8,I.8 Data Interface,I.8 Data Interface,6.1.2 Log System Data,1.616,0.393,3.65,0.264,0.189,0.0
+I.8,I.8 Data Interface,I.8 Data Interface,3.2.2 Analyze Safety Data,1.403,0.417,3.245,0.108,0.027,0.0
+I.8,I.8 Data Interface,I.8 Data Interface,6.1.3 Store Performance Data,1.396,0.414,3.245,0.064,0.027,0.0
+I.7,I.7 Human Interface,I.7 Human Interface,7.1.7 Provide Structural Surface,1.871,0.476,4.383,0.152,0.0,0.0
+I.7,I.7 Human Interface,I.7 Human Interface,2.3.4 Provide Local Heating,1.864,0.443,4.383,0.152,0.0,0.0
+I.7,I.7 Human Interface,I.7 Human Interface,5.1.3 Redirect Operations (Reconfiguration after faults),1.374,0.588,3.078,0.11,0.046,0.0
+I.6,I.6 Existing Infrastructure,I.6 Existing Infrastructure,4.1.1 Track Resources (Automated tracking),2.007,0.515,4.703,0.145,0.007,0.0
+I.6,I.6 Existing Infrastructure,I.6 Existing Infrastructure,4.1.3.1 Coordinate Automated Resource Transfer,1.98,0.42,4.703,0.089,0.007,0.0
+I.6,I.6 Existing Infrastructure,I.6 Existing Infrastructure,4.2.2 Coordinate Resource Transfers (Remote coordination),1.873,0.547,4.364,0.111,0.007,0.0
+I.5,I.5 Launch Vehicle Compatibility,I.5 Launch Vehicle Compatibility,2.2.4 Transmit Launch Vehicle Power,3.989,0.449,9.728,0.038,0.012,0.0
+I.5,I.5 Launch Vehicle Compatibility,I.5 Launch Vehicle Compatibility,7.1.5 Control Antenna Position,1.57,0.504,3.652,0.041,0.011,0.0
+I.5,I.5 Launch Vehicle Compatibility,I.5 Launch Vehicle Compatibility,8.2.3 Control Attitude Using Reaction Torque,1.461,0.53,3.369,0.038,0.011,0.0
+I.4,I.4 Resupply and Retrieval,I.4 Resupply and Retrieval,4.1.2 Request Resupply (Autonomous resupply request),2.405,0.639,5.629,0.149,0.016,0.0
+I.4,I.4 Resupply and Retrieval,I.4 Resupply and Retrieval,4.1.3 Receive Resupply,2.22,0.465,5.261,0.125,0.016,0.0
+I.4,I.4 Resupply and Retrieval,I.4 Resupply and Retrieval,4.2.1 Schedule Resupply Operations (Automated scheduling),1.769,0.523,4.125,0.073,0.016,0.0
+I.3,I.3 Infrastructure Interface,I.3 Infrastructure Interface,2.1.5 Test System After Repairs,3.986,0.527,9.607,0.139,0.085,0.0
+I.3,I.3 Infrastructure Interface,I.3 Infrastructure Interface,7.1.8 Support Platform Structure,3.464,0.403,8.43,0.061,0.01,0.0
+I.3,I.3 Infrastructure Interface,I.3 Infrastructure Interface,2.1.4.2 Coordinate Remote Repair Support (Ground-based intervention),2.632,0.502,6.307,0.043,0.009,0.0
+I.2,I.2 Telemetry Transmission,I.2 Telemetry Transmission,1.2.1 Collect Real-Time Production Data,4.487,0.575,10.826,0.234,0.03,0.0
+I.2,I.2 Telemetry Transmission,I.2 Telemetry Transmission,5.2.1.2 Transmit RF Signal,2.035,0.474,4.785,0.173,0.0,0.0
+I.2,I.2 Telemetry Transmission,I.2 Telemetry Transmission,2.2.5 Transmit Electrical Power,1.862,0.446,4.383,0.133,0.0,0.0
+I.1,I.1 Command Reception,I.1 Command Reception,5.2.1 Receive Remote Commands,3.972,0.41,9.683,0.1,0.008,0.0
+I.1,I.1 Command Reception,I.1 Command Reception,7.2.1 Prepare for Software Installation/Update,3.837,0.519,9.253,0.193,0.015,0.0
+I.1,I.1 Command Reception,I.1 Command Reception,1.2.5 Transmit Data to Ground Control,3.06,0.526,7.248,0.338,0.026,0.0
+F.19,F.19 Real-Time Data Transmission,F.19 Real-Time Data Transmission,1.2.1 Collect Real-Time Production Data,4.494,0.602,10.826,0.247,0.03,0.0
+F.19,F.19 Real-Time Data Transmission,F.19 Real-Time Data Transmission,1.2.5 Transmit Data to Ground Control,3.119,0.575,7.411,0.247,0.012,0.0
+F.19,F.19 Real-Time Data Transmission,F.19 Real-Time Data Transmission,5.2.1.2 Transmit RF Signal,2.042,0.504,4.785,0.183,0.0,0.0
+F.18,F.18 Quality Control Redundancy,F.18 Quality Control Redundancy,6.1.1 Capture Sensor Data (Automated and continuous),3.859,0.552,9.326,0.115,0.005,0.0
+F.18,F.18 Quality Control Redundancy,F.18 Quality Control Redundancy,2.1.5.2 Remote Monitoring of Repair Testing,2.138,0.468,5.025,0.226,0.004,0.0
+F.18,F.18 Quality Control Redundancy,F.18 Quality Control Redundancy,2.1.3.1 Monitor Sensor Data (Remote diagnostics support),1.874,0.556,4.35,0.144,0.005,0.0
+F.17,F.17 In-situ Annealing,F.17 In-situ Annealing,1.1.5 Cool/ Anneal Fiber,1.258,0.548,2.82,0.052,0.065,0.0
+F.17,F.17 In-situ Annealing,F.17 In-situ Annealing,1.1.6 Spool Fiber,1.245,0.481,2.82,0.053,0.065,0.0
+F.17,F.17 In-situ Annealing,F.17 In-situ Annealing,1.1.4 Draw Fiber from Preform,1.167,0.505,2.583,0.135,0.065,0.0
+F.16,F.16 Fiber Diameter Control,F.16 Fiber Diameter Control,1.1.7.1 Measure Fiber Diameter,3.516,0.484,8.495,0.091,0.04,0.0
+F.16,F.16 Fiber Diameter Control,F.16 Fiber Diameter Control,4.1.4 Store Preform at Target Parameters,2.152,0.611,5.025,0.129,0.004,0.0
+F.16,F.16 Fiber Diameter Control,F.16 Fiber Diameter Control,7.1.5 Control Antenna Position,1.585,0.545,3.652,0.091,0.011,0.0
+F.15,F.15 Preform Alignment,F.15 Preform Alignment,1.1.4 Draw Fiber from Preform,2.937,0.556,6.966,0.168,0.07,0.0
+F.15,F.15 Preform Alignment,F.15 Preform Alignment,1.1.3 Heat Preform,2.025,0.49,4.785,0.064,0.016,0.0
+F.15,F.15 Preform Alignment,F.15 Preform Alignment,1.1.3.3 Hold Preform,2.015,0.489,4.785,0.0,0.016,0.0
+F.14,F.14 Remote Monitoring,F.14 Remote Monitoring,2.1.4.2 Coordinate Remote Repair Support (Ground-based intervention),4.436,0.625,10.717,0.149,0.01,0.0
+F.14,F.14 Remote Monitoring,F.14 Remote Monitoring,2.1.5.2 Remote Monitoring of Repair Testing,3.692,0.548,8.904,0.135,0.005,0.0
+F.14,F.14 Remote Monitoring,F.14 Remote Monitoring,1.2.5 Transmit Data to Ground Control,3.581,0.584,8.582,0.18,0.02,0.0
+F.13,F.13 Automated Inspection,F.13 Automated Inspection,4.2.5 Store Manufactured Product,3.235,0.396,7.857,0.056,0.022,0.0
+F.13,F.13 Automated Inspection,F.13 Automated Inspection,3.1.1.1 Conduct Autonomous Safety Inspections,2.302,0.419,5.453,0.242,0.004,0.0
+F.13,F.13 Automated Inspection,F.13 Automated Inspection,6.1.1 Capture Sensor Data (Automated and continuous),1.867,0.526,4.364,0.106,0.0,0.0
+F.12,F.12 Process Optimization,F.12 Process Optimization,6.2.3 Generate Optimization Suggestions (Autonomous optimization algorithms),4.661,0.611,11.303,0.11,0.006,0.0
+F.12,F.12 Process Optimization,F.12 Process Optimization,1.2.2 Analyze Production Efficiency,3.605,0.488,8.692,0.165,0.029,0.0
+F.12,F.12 Process Optimization,F.12 Process Optimization,1.1.7.2 Detect Defects,2.336,0.462,5.567,0.105,0.005,0.0
+F.11,F.11 Emergency Procedures,F.11 Emergency Procedures,1.2.3 Detect Production Anomalies,4.225,0.482,10.295,0.062,0.005,0.0
+F.11,F.11 Emergency Procedures,F.11 Emergency Procedures,5.1.1 Initiate System Restarts,2.48,0.429,5.853,0.029,0.243,0.0
+F.11,F.11 Emergency Procedures,F.11 Emergency Procedures,3.3.3 Execute End-of-Life Deorbiting Procedures,2.013,0.627,4.663,0.138,0.008,0.0
+F.10,F.10 Data Security,F.10 Data Security,4.2.4 Secure Docking Connection,1.948,0.493,4.585,0.104,0.0,0.0
+F.10,F.10 Data Security,F.10 Data Security,3.1.3 Implement Policy Changes,1.944,0.439,4.585,0.152,0.0,0.0
+F.10,F.10 Data Security,F.10 Data Security,1.2.5.4 Amplify Low Rate Transmission,1.908,0.493,4.445,0.207,0.005,0.0
+F.9,F.9 Maintenance and Serviceability,F.9 Maintenance and Serviceability,7.1.1 Receive and Secure Modules in Orbit,1.901,0.519,4.445,0.112,0.012,0.0
+F.9,F.9 Maintenance and Serviceability,F.9 Maintenance and Serviceability,2.1.5 Test System After Repairs,0.308,0.529,0.405,0.108,0.122,0.0
+F.8,F.8 Waste Management,F.8 Waste Management,1.2.4 Generate Production Reports,2.153,0.434,5.099,0.18,0.0,0.0
+F.8,F.8 Waste Management,F.8 Waste Management,2.2.1 Generate Solar Power,2.152,0.426,5.099,0.18,0.0,0.0
+F.8,F.8 Waste Management,F.8 Waste Management,6.2.3 Generate Optimization Suggestions (Autonomous optimization algorithms),1.759,0.597,4.071,0.074,0.0,0.0
+F.7,F.7 Timeliness,F.7 Timeliness,5.2.1 Receive Remote Commands,2.149,0.413,5.099,0.158,0.018,0.0
+F.7,F.7 Timeliness,F.7 Timeliness,4.2.5 Store Manufactured Product,1.762,0.362,4.205,0.051,0.0,0.0
+F.7,F.7 Timeliness,F.7 Timeliness,2.1.5 Test System After Repairs,0.337,0.515,0.405,0.05,0.324,0.0
+F.6,F.6 Risk Management,F.6 Risk Management,3.2.3 Implement Safety Measures (Automated actions to mitigate risk),3.297,0.63,7.854,0.188,0.005,0.0
+F.6,F.6 Risk Management,F.6 Risk Management,3.2.1 Detect Safety Hazards (Autonomous hazard detection),2.781,0.646,6.583,0.121,0.002,0.0
+F.6,F.6 Risk Management,F.6 Risk Management,6.2.2 Identify Performance Bottlenecks,2.49,0.538,5.912,0.118,0.0,0.0
+F.5,F.5 Scientific Experimentation,F.5 Scientific Experimentation,1.3.1 Monitor Microgravity Conditions,1.954,0.447,4.585,0.177,0.022,0.0
+F.5,F.5 Scientific Experimentation,F.5 Scientific Experimentation,1.3.2 Detect Off-Nominal Microgravity Conditions,1.842,0.523,4.229,0.275,0.022,0.0
+F.5,F.5 Scientific Experimentation,F.5 Scientific Experimentation,1.3.3 Adjust Manufacturing Parameters for Off-Nominal Conditions,1.421,0.575,3.126,0.319,0.041,0.0
+F.4,F.4 Packaging and Storage,F.4 Packaging and Storage,8.2.6 Store Propellant,2.014,0.496,4.785,0.0,0.005,0.0
+F.4,F.4 Packaging and Storage,F.4 Packaging and Storage,8.2.4 Store Pressurant,2.014,0.495,4.785,0.0,0.005,0.0
+F.4,F.4 Packaging and Storage,F.4 Packaging and Storage,6.1.3 Store Performance Data,1.853,0.496,4.383,0.0,0.005,0.0
+F.3,F.3 Real-Time Monitoring,F.3 Real-Time Monitoring,1.3.3 Adjust Manufacturing Parameters for Off-Nominal Conditions,4.717,0.624,11.376,0.258,0.018,0.0
+F.3,F.3 Real-Time Monitoring,F.3 Real-Time Monitoring,1.2.1 Collect Real-Time Production Data,4.48,0.58,10.826,0.195,0.02,0.0
+F.3,F.3 Real-Time Monitoring,F.3 Real-Time Monitoring,8.1.1 Monitor Orbital Parameters,3.552,0.472,8.591,0.132,0.008,0.0
+F.2,F.2 Fiber Drawing,F.2 Fiber Drawing,1.1.4 Draw Fiber from Preform,5.106,0.486,12.413,0.195,0.074,0.0
+F.2,F.2 Fiber Drawing,F.2 Fiber Drawing,1.1.3 Heat Preform,2.008,0.451,4.785,0.0,0.016,0.0
+F.2,F.2 Fiber Drawing,F.2 Fiber Drawing,1.1.3.3 Hold Preform,2.004,0.431,4.785,0.0,0.016,0.0
+F.1,F.1 Secondary Missions,F.1 Secondary Missions,7.1.8 Support Platform Structure,1.734,0.518,4.047,0.069,0.006,0.0
+F.1,F.1 Secondary Missions,F.1 Secondary Missions,2.1.3.1 Monitor Sensor Data (Remote diagnostics support),1.442,0.629,3.231,0.149,0.006,0.0
+F.1,F.1 Secondary Missions,F.1 Secondary Missions,1.2.3 Detect Production Anomalies,1.44,0.55,3.245,0.173,0.032,0.0
+C.11,C.11 Technology Readiness,C.11 Technology Readiness,1.2.5.2 Amplify High Rate Transmission,2.316,0.488,5.453,0.251,0.0,0.0
+C.11,C.11 Technology Readiness,C.11 Technology Readiness,1.1.6.2 Level Wind Spool,2.073,0.489,4.819,0.3,0.011,0.0
+C.11,C.11 Technology Readiness,C.11 Technology Readiness,2.4.1 Monitor Radiation Levels,2.046,0.434,4.819,0.2,0.011,0.0
+C.10,C.10 Economic Viability,C.10 Economic Viability,2.1.5 Test System After Repairs,0.327,0.546,0.405,0.114,0.195,0.0
+C.10,C.10 Economic Viability,C.10 Economic Viability,2.3.2 Regulate System Temperature,0.306,0.441,0.405,0.114,0.195,0.0
+C.9,C.9 End-of-Life Management,C.9 End-of-Life Management,3.3.3 Execute End-of-Life Deorbiting Procedures,5.802,0.681,14.088,0.181,0.019,0.0
+C.9,C.9 End-of-Life Management,C.9 End-of-Life Management,2.1.5 Test System After Repairs,0.328,0.582,0.405,0.072,0.195,0.0
+C.9,C.9 End-of-Life Management,C.9 End-of-Life Management,2.3.6 Insulate System Thermally,0.302,0.498,0.405,0.012,0.195,0.0
+C.8,C.8 Regulatory Compliance,C.8 Regulatory Compliance,7.1.1 Receive and Secure Modules in Orbit,1.909,0.557,4.445,0.089,0.032,0.0
+C.8,C.8 Regulatory Compliance,C.8 Regulatory Compliance,4.2.5 Store Manufactured Product,1.766,0.405,4.205,0.02,0.0,0.0
+C.8,C.8 Regulatory Compliance,C.8 Regulatory Compliance,2.1.5 Test System After Repairs,0.357,0.559,0.405,0.12,0.324,0.0
+C.7,C.7 Payload Interference,C.7 Payload Interference,7.1.8 Support Platform Structure,1.852,0.437,4.383,0.06,0.014,0.0
+C.7,C.7 Payload Interference,C.7 Payload Interference,5.1.3 Redirect Operations (Reconfiguration after faults),1.367,0.591,3.078,0.079,0.031,0.0
+C.7,C.7 Payload Interference,C.7 Payload Interference,2.4.3 Adjust Operations for Radiation Protection,1.348,0.466,3.078,0.119,0.031,0.0
+C.6,C.6 Environmental Impact,C.6 Environmental Impact,3.3.3 Execute End-of-Life Deorbiting Procedures,3.777,0.698,9.027,0.169,0.004,0.0
+C.6,C.6 Environmental Impact,C.6 Environmental Impact,3.3.1 Monitor Orbital Environment for Debris,3.712,0.66,8.904,0.119,0.004,0.0
+C.6,C.6 Environmental Impact,C.6 Environmental Impact,8.2.5 Transfer Propellant,2.109,0.499,5.006,0.04,0.004,0.0
+C.5,C.5 Approved Materials,C.5 Approved Materials,2.3.1 Monitor Thermal Environment,1.923,0.367,4.585,0.089,0.013,0.0
+C.5,C.5 Approved Materials,C.5 Approved Materials,3.3.1 Monitor Orbital Environment for Debris,1.825,0.528,4.229,0.169,0.013,0.0
+C.5,C.5 Approved Materials,C.5 Approved Materials,2.1.5 Test System After Repairs,0.325,0.506,0.405,0.149,0.195,0.0
+C.4,C.4 National Goals,C.4 National Goals,7.1.4 Verify Hardware Installation,1.482,0.46,3.435,0.105,0.0,0.0
+C.4,C.4 National Goals,C.4 National Goals,7.2.4 Verify Software Installation,1.481,0.456,3.435,0.105,0.0,0.0
+C.4,C.4 National Goals,C.4 National Goals,2.1.5 Test System After Repairs,0.318,0.588,0.405,0.093,0.122,0.0
+C.3,C.3 Power Budget,C.3 Power Budget,7.1.8 Support Platform Structure,1.863,0.477,4.383,0.075,0.014,0.0
+C.3,C.3 Power Budget,C.3 Power Budget,2.2.2 Condition Power,1.743,0.395,4.119,0.075,0.023,0.0
+C.3,C.3 Power Budget,C.3 Power Budget,2.2.3 Distribute Power,1.74,0.398,4.119,0.05,0.023,0.0
+C.2,C.2 Debris Mitigation,C.2 Debris Mitigation,3.3.1 Monitor Orbital Environment for Debris,2.158,0.578,5.025,0.196,0.016,0.0
+C.2,C.2 Debris Mitigation,C.2 Debris Mitigation,6.1.2 Log System Data,0.357,0.516,0.405,0.29,0.243,0.0
+C.2,C.2 Debris Mitigation,C.2 Debris Mitigation,2.1.5 Test System After Repairs,0.345,0.565,0.405,0.142,0.243,0.0
+C.1,C.1 Safety Compliance,C.1 Safety Compliance,3.1.1 Monitor Safety Standards (Automated safety checks),2.015,0.571,4.683,0.167,0.014,0.0
+C.1,C.1 Safety Compliance,C.1 Safety Compliance,7.1.8 Support Platform Structure,1.856,0.451,4.383,0.07,0.012,0.0
+C.1,C.1 Safety Compliance,C.1 Safety Compliance,3.2.2 Analyze Safety Data,1.792,0.444,4.205,0.119,0.014,0.0
