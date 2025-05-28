@@ -1,205 +1,266 @@
-# Requirements-to-Activities Hybrid Matching Tool (spaCy Transformer Edition)
+# Requirements-to-Activities Matching Tool
 
-This tool matches system requirements to activities using a **hybrid approach**:  
-- **Linguistic matching** (verb/noun overlap)  
-- **Semantic similarity** (transformer-based, using spaCy’s `en_core_web_trf`)
+**Theoretically Enhanced Matching System using spaCy Transformers and Information Retrieval Techniques**
 
-It is designed for traceability and explainability in engineering, aerospace, and systems projects.
+This repository provides a tool for automatically matching system requirements to engineering activities using a hybrid of semantic, lexical, syntactic, and domain-aware similarity techniques. The tool is built for traceability, documentation support, and structured analysis in technical domains such as aerospace, defense, and systems engineering.
 
 ---
 
-## matcher.py Overview
+## Table of Contents
 
-**Purpose:**  
-Automatically link requirements to the most relevant activities, combining both explicit word matching and deep semantic language understanding.
-
-**Inputs:**  
-- `requirements.csv` (columns: `Requirement Name`, `Requirement Text`)
-- `activities.csv` (column: `Activity Name`)
-
-**Outputs:**  
-- `hybrid_matches_trf.csv`
-- `hybrid_matches_trf.xlsx`
-
-**What you get:**  
-For each requirement, a ranked list of activities with scores showing how well each activity matches, based on both explicit verb/noun overlap and semantic similarity. The requirement ID is preserved in the output for traceability.
-
-### Key Functionalities:
-
-- **Hyperparameters**:
-  - `vn_weights`: List of weights for vector similarity (e.g., [0.0, 0.2, ..., 1.0]).
-  - `sem_weights`: Complementary weights for semantic similarity.
-  - `min_sims`: List of minimum similarity thresholds (e.g., [0.2, 0.3, ..., 0.6]).
-  - `top_ns`: Number of top matches to evaluate (currently fixed to [5]).
-
-- **Execution Loop**:
-  - Iterates over the Cartesian product of the parameter values using `itertools.product`.
-  - Runs the matching algorithm for each combination.
-  - Evaluates the result against the manual match file.
-
-- **Output**:
-  - Stores evaluation metrics for each parameter set in a list.
-  - Saves a summary DataFrame of all evaluations to `grid_search_results.csv`.
-  - Prints progress and alerts if a run returns no usable results.
-
-This script is ideal for identifying the best-performing configuration of the matching system based on quantitative evaluation metrics.
+* [Overview](#overview)
+* [Key Features](#key-features)
+* [How It Works](#how-it-works)
+* [Installation](#installation)
+* [Input Format](#input-format)
+* [Execution](#execution)
+* [Output Format](#output-format)
+* [Evaluation Framework](#evaluation-framework)
+* [Sample Output Row](#sample-output-row)
+* [Libraries Used](#libraries-used)
+* [Configuration Options](#configuration-options)
+* [Future Enhancements](#future-enhancements)
 
 ---
 
-## Quick Start
+## Overview
 
-### 1. Install Anaconda  
-Download and install the [Anaconda Individual Edition](https://www.anaconda.com/products/distribution) from the official site.
+This tool identifies the most relevant activity or set of activities that correspond to a given requirement. It combines natural language processing (NLP) with information retrieval (IR) theory to ensure high-quality traceability between functional descriptions and operational tasks.
 
-### 2. Create and Activate a New Environment  
-(Optional but recommended for isolation.)
+---
+
+## Key Features
+
+* **Semantic Similarity**: Deep contextual understanding using RoBERTa transformer embeddings via spaCy.
+* **Lexical Matching**: Term-based scoring using BM25, an advanced alternative to TF-IDF.
+* **Syntactic Analysis**: Dependency relations, POS sequences, and verb frame structures capture linguistic parallels.
+* **Domain-Specific Term Weighting**: Increases weight of important engineering and system-specific terminology.
+* **Query Expansion**: Incorporates related terms using embedding-based similarity to overcome terminology mismatches.
+* **Robust Preprocessing**: Lemmatization, stopword removal, and optional synonym expansion ensure clean input processing.
+* **Encoding Detection**: Automatically detects character encodings in CSVs to prevent file read failures.
+
+---
+
+## How It Works
+
+### Step-by-Step Process
+
+1. **Data Loading**
+
+   * Requirements and activities are loaded from CSV files.
+   * Encoding is automatically detected to handle various file formats.
+
+2. **Text Preprocessing**
+
+   * Inputs are lowercased, lemmatized, stripped of stopwords and punctuation.
+   * Phrases are collapsed, noun/verb features are extracted, and query expansion is applied.
+
+3. **Domain Term Extraction**
+
+   * Noun chunks and named entities are analyzed to identify domain-specific terms, which are weighted and normalized.
+
+4. **Document Representation**
+
+   * Each requirement and activity is processed using `spaCy`’s `en_core_web_trf` transformer model.
+   * Embeddings are extracted from the final transformer layer.
+
+5. **Similarity Computation**
+   For each requirement–activity pair, the following scores are computed:
+
+   * **Dense Semantic**: Cosine similarity between mean transformer embeddings.
+   * **BM25**: Lexical match score accounting for term saturation and document length.
+   * **Syntactic**: Structural similarity using Jaccard similarity over syntactic features.
+   * **Domain Weighted**: Emphasizes overlap on domain-specific terms.
+   * **Query Expansion**: Measures how many semantically similar terms overlap.
+
+6. **Score Aggregation**
+
+   * Weighted sum of all similarity components (user configurable).
+   * Only matches above a minimum score threshold are retained.
+
+7. **Result Filtering**
+
+   * Top-N matches per requirement are selected and output for analysis.
+
+---
+
+## Installation
+
+### Environment Setup
+
 ```bash
 conda create -n reqmatch python=3.12
 conda activate reqmatch
+pip install pandas numpy openpyxl spacy scikit-learn matplotlib seaborn chardet
+python -m spacy download en_core_web_trf
 ```
-### 3. **Install dependencies:**  
-   Open a terminal and run:
-   ```
-   conda install pandas numpy openpyxl spacy
-   python -m spacy download en_core_web_trf
-   ```
-### 4. Prepare Input Files
-Place your requirements.csv and activities.csv in the same folder as the script.
-
-    requirements.csv must include: ID, Requirement Name, Requirement Text
-
-    activities.csv must include: Activity Name
-### 5. **Run the script:**
-   ```
-   python matcher.py
-   ```
-### 6. Review the Output
-
-Results are written to:
-
-    hybrid_matches_trf.csv
-
-    hybrid_matches_trf.xlsx
----
-
-## How It Works 
-
-### Libraries Used
-
-| Library      | Purpose                                                                                 |
-|--------------|-----------------------------------------------------------------------------------------|
-| pandas       | Data manipulation, reading/writing CSV and Excel files                                  |
-| spacy        | Natural Language Processing (NLP): transformer embeddings, POS tagging, lemmatization   |
-| numpy        | Vector math for cosine similarity                                                       |
-| openpyxl     | Excel file writing through pandas                                                       |
-
-### Model Used
-
-- **spaCy `en_core_web_trf`**  
-  - Transformer-based, uses RoBERTa under the hood for deep contextual understanding.
-  - Provides: POS tagging, lemmatization, dependency parsing, NER, and transformer embeddings.
-  - No static word vectors; all similarity is calculated from transformer output.
-
-### Algorithm Steps
-
-1. **Load Data**  
-   - Reads requirements and activities from CSV files.
-2. **Extract Verbs and Nouns**  
-   - For each activity, extracts lemmatized verbs and nouns using spaCy’s POS tagger.
-3. **Precompute Activity Documents**  
-   - Uses `nlp.pipe` for efficient batch processing of activity names.
-4. **Match Each Requirement to Activities**
-   - For each requirement:
-     - Lemmatizes and collects all lemmas.
-     - For each activity:
-       - **Verb/Noun Score:** Fraction of activity verbs/nouns present in requirement.
-       - **Semantic Similarity:** Cosine similarity of mean transformer embeddings (using `.last_hidden_layer_state.data`).
-       - **Combined Score:** Weighted sum (default: 80% verb/noun, 20% semantic).
-     - Keeps top N matches per requirement above a minimum threshold.
-5. **Output**  
-   - Saves results to CSV and Excel, including all component scores for transparency.
 
 ---
 
-### Key Function Calls & Their Purpose
+## Input Format
 
-| Function/Call                                    | Purpose                                                                                 |
-|--------------------------------------------------|-----------------------------------------------------------------------------------------|
-| `spacy.load("en_core_web_trf")`                  | Loads transformer-based English pipeline                                                |
-| `nlp(text)`                                      | Processes text: tokenization, tagging, transformer embedding                            |
-| `extract_action_parts(text)`                     | Extracts lemmatized verbs/nouns from activity name                                      |
-| `doc._.trf_data.last_hidden_layer_state.data`    | Gets transformer output as numpy array for similarity calculation                       |
-| `trf_similarity(doc1, doc2)`                     | Calculates cosine similarity between two texts using transformer embeddings              |
-| `pandas.DataFrame.to_csv/to_excel`               | Writes results to CSV/Excel                                                             |
+### `requirements.csv`
 
----
+| Column Name        | Description                                 |
+| ------------------ | ------------------------------------------- |
+| `ID`               | Unique requirement identifier               |
+| `Requirement Name` | Short requirement title                     |
+| `Requirement Text` | Full textual description of the requirement |
 
-### Configuration Parameters
+### `activities.csv`
 
-- `VERB_NOUN_WEIGHT`: Weight for verb/noun matching (default 0.8)
-- `SEMANTIC_WEIGHT`: Weight for semantic similarity (default 0.2)
-- `MIN_SIMILARITY`: Minimum combined score to consider a match (default 0.4)
-- `TOP_N`: Max number of matches per requirement (default 5)
+| Column Name     | Description                                     |
+| --------------- | ----------------------------------------------- |
+| `Activity Name` | Operational task or system function description |
 
 ---
 
-### Example Output Row
+## Execution
 
-| Requirement ID | Requirement Text         | Activity Name | Activity Verbs | Activity Nouns | VerbNoun Score | Similarity Score | Combined Score |
-|----------------|-------------------------|---------------|---------------|---------------|---------------|-----------------|---------------|
-| REQ-001        | The system shall store… | store data    | store         | data          | 1.0           | 0.82            | 0.856         |
+### Matching
 
----
+```bash
+python matcher.py
+```
 
-## Notes and Best Practices
+### Evaluation
 
-- **The transformer model (`en_core_web_trf`) is slower and more resource-intensive** than spaCy’s medium model, but yields much better semantic similarity, especially for complex or nuanced requirements.
-- **No static word vectors:** All similarity is computed from transformer outputs.
-- **You can adjust weights and thresholds** at the top of the script to tune for your domain.
-
----
-
-## evaluator.py
-
-The `evaluator.py` script provides a comprehensive evaluation framework to assess the performance of automated activity matching systems by comparing predicted matches against a manually curated reference. The main function, `evaluator_with_prf`, calculates various metrics to evaluate matching accuracy, including precision, recall, F1 score, top-N accuracy, and Mean Reciprocal Rank (MRR).
-
-### Key Functionalities:
-
-- **File Inputs**:
-  - `manual_file`: Path to a CSV file containing the manually matched activities (`manual_matches.csv` by default).
-  - `auto_file`: Path to a CSV file containing the automatically generated matches (`hybrid_matches_trf.csv` by default).
-
-- **Preprocessing**:
-  - Loads and normalizes activity names to lowercase and strips any context markers to ensure consistent matching.
-  - Groups automatic matches by requirement ID and extracts the top-N highest scoring predictions.
-
-- **Evaluation Metrics**:
-  - **Top-N Accuracy**: Measures whether any of the manually matched activities appear in the top-N predictions.
-  - **Top-1 Accuracy**: Measures whether the top prediction exactly matches the first manual match.
-  - **Precision, Recall, F1 Score**: Computed per row and averaged across all examples.
-  - **MRR (Mean Reciprocal Rank)**: Evaluates how high the first correct match appears in the predicted ranking.
-
-- **Outputs**:
-  - A summary dictionary with all computed metrics.
-  - A DataFrame with detailed evaluation results per requirement.
-  - Prints performance statistics to the console.
-  - Displays up to 10 examples where the automated matcher failed to include the correct result in the top-N list.
-
-- **Robustness**:
-  - Gracefully handles missing or empty input files.
-  - Applies defensive programming techniques to avoid crashing on malformed data.
-
-This script is intended to be executed as a standalone module, providing immediate feedback on matching model performance.
+```bash
+python evaluator.py
+```
 
 ---
 
-## grid_search.py
+## Output Format
 
-The `grid_search.py` script automates the process of hyperparameter tuning for the matching system by running multiple combinations of vector-based and semantic similarity weights, similarity thresholds, and top-N values. It leverages the `run_matcher` and `evaluator_with_prf` functions from the `matcher` and `evaluator` modules, respectively.
+Matching results are saved as CSV files in a `results/` directory, typically named after their configuration:
 
-## References
+* `results/semantic_focused.csv`
+* `results/lexical_focused.csv`
+* `results/balanced.csv`
 
-- [spaCy en_core_web_trf Model Card](https://spacy.io/models/en#en_core_web_trf)
-- [spaCy English Models Overview](https://spacy.io/models/en)
-- [spaCy Documentation: Vectors & Similarity](https://spacy.io/usage/vectors-similarity)
+Each row contains:
 
+* The matched requirement and activity
+* Scores for each similarity component
+* The final combined score
+
+---
+
+## Evaluation Framework
+
+The `evaluator.py` script evaluates the accuracy of automated matches against a manually curated reference file (`manual_matches.csv`). It computes a set of standard Information Retrieval metrics:
+
+### Metrics Explained
+
+| Metric                                              | Description                                                                                                                             |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Precision\@k**                                    | The fraction of the top-k predicted activities that are relevant. Higher precision means fewer false positives.                         |
+| **Recall\@k**                                       | The fraction of all relevant activities that appear in the top-k predictions. Higher recall means fewer false negatives.                |
+| **F1\@k**                                           | The harmonic mean of precision and recall at rank k. Provides a single value to balance precision and recall.                           |
+| **MRR (Mean Reciprocal Rank)**                      | Measures how high the first correct match appears in the ranked list. A value of 1.0 means the correct activity is always ranked first. |
+| **NDCG\@k (Normalized Discounted Cumulative Gain)** | Captures both relevance and rank, rewarding correct predictions that appear earlier in the list.                                        |
+
+### Sample Evaluation Output (Console)
+
+```
+MATCHING EVALUATION SUMMARY
+======================================================================
+Dataset Coverage:
+  Total requirements: 120
+  Requirements with predictions: 120
+  Coverage: 100.0%
+
+Key Performance Metrics:
+  MRR (Mean Reciprocal Rank): 0.389 ± 0.102
+
+  Precision@k:
+    P@1: 0.301 ± 0.12
+    P@3: 0.217 ± 0.09
+    P@5: 0.192 ± 0.08
+
+  Recall@k:
+    R@1: 0.187 ± 0.10
+    R@3: 0.254 ± 0.12
+    R@5: 0.296 ± 0.14
+
+  F1@k:
+    F1@1: 0.226 ± 0.11
+    F1@3: 0.232 ± 0.10
+    F1@5: 0.213 ± 0.09
+
+  NDCG@k:
+    NDCG@1: 0.301 ± 0.08
+    NDCG@3: 0.272 ± 0.07
+    NDCG@5: 0.290 ± 0.09
+```
+
+The script also offers:
+
+* Visual plots for each metric
+* Side-by-side comparison across configurations
+* Detailed per-requirement results in CSV
+
+---
+
+## Sample Output Row
+
+Here is an example row from the output file:
+
+| Requirement ID | Requirement Text                       | Activity Name | Combined Score | Dense Semantic | BM25 Score | Syntactic Score | Domain Weighted | Query Expansion |
+| -------------- | -------------------------------------- | ------------- | -------------- | -------------- | ---------- | --------------- | --------------- | --------------- |
+| REQ-001        | The system shall store encrypted logs. | store logs    | 0.842          | 0.89           | 0.61       | 0.75            | 0.58            | 0.25            |
+
+This row indicates that the requirement “store encrypted logs” was strongly matched to the activity “store logs” with a high combined confidence score. Each component score is also included to support traceability and tuning.
+
+---
+
+## Libraries Used
+
+| Library        | Purpose                                                      |
+| -------------- | ------------------------------------------------------------ |
+| `spaCy`        | NLP processing, transformer embeddings, POS tagging, parsing |
+| `pandas`       | Data loading and CSV handling                                |
+| `numpy`        | Vector math and statistical functions                        |
+| `scikit-learn` | TF-IDF vectorization, cosine similarity                      |
+| `matplotlib`   | Metric visualization                                         |
+| `seaborn`      | Enhanced plotting                                            |
+| `chardet`      | Automatic file encoding detection                            |
+| `openpyxl`     | Excel output support for `.xlsx` formats                     |
+
+---
+
+## Configuration Options
+
+Modify configuration parameters within `matcher.py` or pass explicitly:
+
+```python
+matcher.run_enhanced_matcher(
+    weights={
+        'dense_semantic': 0.4,
+        'bm25': 0.2,
+        'syntactic': 0.2,
+        'domain_weighted': 0.1,
+        'query_expansion': 0.1
+    },
+    min_sim=0.35,
+    top_n=5,
+    out_file="results/semantic_focused"
+)
+```
+
+---
+
+## Future Enhancements
+
+* Integration of synonym dictionaries and controlled vocabularies
+* Fine-tuning embeddings on engineering documents (e.g., specifications, CONOPS)
+* Cross-encoder reranker for top-N results
+* Web-based UI for interactive matching and validation
+* Active learning with user feedback for continuous improvement
+
+---
+
+## License
+
+This project is open for educational and non-commercial use. For other uses, please contact the author.
