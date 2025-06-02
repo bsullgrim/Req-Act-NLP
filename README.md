@@ -686,49 +686,6 @@ matcher.run_final_matching(
 
 ---
 
-## Future Enhancements
-
-### Near-Term Improvements
-* **Fine-tuned Embeddings**: Domain-specific transformer training on engineering documents
-* **Cross-Encoder Reranking**: Second-stage reranking for top-N results
-* **Active Learning**: Continuous improvement from user feedback
-* **Multi-Language Support**: Extension beyond English requirements
-
-### Advanced Features
-* **Web Interface**: Interactive matching and validation dashboard
-* **API Integration**: REST API for tool integration
-* **Real-Time Processing**: Streaming analysis for live document updates
-* **Collaborative Review**: Multi-user workflow with conflict resolution
-
-### Quality Analysis Extensions
-* **Industry-Specific Rules**: Aerospace, automotive, medical device standards
-* **Template Matching**: Auto-detection of requirement patterns
-* **Predictive Quality**: Machine learning models for quality prediction
-* **Automated Improvement**: Suggestion generation for requirement enhancement
-
----
-
-## License and Support
-
-This project is open for educational and research use. For commercial applications or support, please contact the development team.
-
-### Citation
-If you use this tool in research, please cite:
-```
-Enhanced Requirements-to-Activities Matching with Quality Analysis
-[Author], [Year]
-[Institution/Organization]
-```
-
-### Contributing
-Contributions welcome! Please see CONTRIBUTING.md for guidelines on:
-* Code standards and testing
-* Documentation requirements  
-* Issue reporting and feature requests
-* Pull request process
-
----
-
 ## Quick Start Checklist
 
 - [ ] Install Python 3.12+ and dependencies
@@ -739,5 +696,3 @@ Contributions welcome! Please see CONTRIBUTING.md for guidelines on:
 - [ ] Check quality scores and address POOR/CRITICAL requirements
 - [ ] Evaluate performance: `python evaluator.py`
 - [ ] Configure weights and thresholds as needed
-
-For detailed usage instructions, see the specific module documentation and examples in the repository.
