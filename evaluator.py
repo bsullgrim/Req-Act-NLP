@@ -28,6 +28,27 @@ class MatchingEvaluator:
         """
         self.ground_truth = self.load_ground_truth(ground_truth_file)
         self.evaluation_results = {}
+    
+    def normalize_activity_name(self, name):
+        """
+        Normalize activity name for consistent matching.
+        
+        Removes:
+        1. ALL leading numbers like "2.3.1 ", "6.1.1.1 ", "1) ", etc.
+        2. Any '(context...)' substring (case-insensitive)
+        3. Extra whitespace and converts to lowercase
+        """
+        if not name:
+            return ""
+        
+        # Remove ALL leading numbers, dots, dashes, and separators
+        name = re.sub(r"^[\d\.\-\)\s]+", "", name)
+        
+        # Remove anything like "(context blah)" regardless of case
+        name = re.sub(r'\(context.*?\)', '', name, flags=re.IGNORECASE)
+        
+        # Trim and lowercase
+        return name.strip().lower()
         
     def load_ground_truth(self, file_path: str) -> Dict[str, List[Dict]]:
         """Load and parse ground truth data from manual_matches.csv style."""
@@ -37,24 +58,7 @@ class MatchingEvaluator:
             
             if not all(col in df.columns for col in required_cols):
                 raise ValueError(f"Ground truth file must contain columns: {required_cols}")
-            
-            # Normalize and expand Satisfied By
-            def normalize_activity_name(name):
-                """
-                Normalizes an activity name by:
-                1. Removing leading step numbers like "1 ", "2. ", "03 - ", "4) ", etc.
-                2. Removing any '(context...)' substring (case-insensitive)
-                3. Stripping whitespace and converting to lowercase
-                """
-                # Step 1: Remove leading step numbers (e.g. "1 ", "2. ", "03 - ", "4) ")
-                #name = re.sub(r"^\s*\d+[\.\-\)]*\s*", "", name)
-
-                # Step 2: Remove anything like "(context blah)" regardless of case
-                name = re.sub(r'\(context.*?\)', '', name, flags=re.IGNORECASE)
-
-                # Step 3: Trim and lowercase
-                return name.strip().lower()
-            
+                
             ground_truth = defaultdict(list)
             for _, row in df.iterrows():
                 req_id = str(row['ID']).strip()
@@ -63,13 +67,14 @@ class MatchingEvaluator:
                 if pd.isna(satisfied_by):
                     continue
                 
-                activity_names = [normalize_activity_name(s) for s in satisfied_by.split(',') if s.strip()]
+                activity_names = [self.normalize_activity_name(s) for s in satisfied_by.split(',') if s.strip()]
                 
                 for activity in activity_names:
-                    ground_truth[req_id].append({
-                        'activity_name': activity,
-                        'relevance_score': 1  # default binary relevance
-                    })
+                    if activity:  # Only add non-empty activities
+                        ground_truth[req_id].append({
+                            'activity_name': activity,
+                            'relevance_score': 1  # default binary relevance
+                        })
             
             logger.info(f"Loaded ground truth for {len(ground_truth)} requirements")
             return dict(ground_truth)
@@ -191,8 +196,8 @@ class MatchingEvaluator:
                              for item in ground_truth_items}
             
             if req_id in predictions_by_req:
-                # Get predicted activities (sorted by score)
-                predicted_activities = [item[0] for item in predictions_by_req[req_id]]
+                # Get predicted activities (sorted by score) and NORMALIZE them
+                predicted_activities = [self.normalize_activity_name(item[0]) for item in predictions_by_req[req_id]]
                 
                 # Compute metrics for this requirement
                 rr = self.compute_reciprocal_rank(predicted_activities, relevant_activities)
@@ -304,7 +309,7 @@ class MatchingEvaluator:
                 std_ndcg = agg[f'ndcg_at_{k}']['std']
                 print(f"    NDCG@{k}: {mean_ndcg:.3f} ± {std_ndcg:.3f}")
     
-    def plot_evaluation_metrics(self, save_path: Optional[str] = None):
+    def plot_evaluation_metrics(self, save_path: Optional[str] = None, config_name: Optional[str] = None):
         """Create visualization of evaluation metrics."""
         if not self.evaluation_results:
             logger.error("No evaluation results available.")
@@ -314,7 +319,17 @@ class MatchingEvaluator:
         
         # Set up the plot
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
-        fig.suptitle('Text Matching Evaluation Results', fontsize=16, fontweight='bold')
+        
+        # Create title with configuration name if provided
+        if config_name:
+            title = f'Text Matching Evaluation Results - {config_name.upper()}'
+            # Add F1@5 score to title for quick reference
+            f1_score = agg.get('f1_at_5', {}).get('mean', 0)
+            title += f' (F1@5: {f1_score:.3f})'
+        else:
+            title = 'Text Matching Evaluation Results'
+            
+        fig.suptitle(title, fontsize=16, fontweight='bold')
         
         # Precision@k plot
         k_values = [1, 3, 5, 10]
@@ -368,6 +383,8 @@ class MatchingEvaluator:
         plt.tight_layout()
         
         if save_path:
+            # Ensure the directory exists
+            Path(save_path).parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
             logger.info(f"Evaluation plots saved to {save_path}")
         
@@ -378,6 +395,9 @@ class MatchingEvaluator:
         if not self.evaluation_results or 'detailed_results' not in self.evaluation_results:
             logger.error("No detailed results available.")
             return
+        
+        # Ensure the directory exists
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
         
         detailed_df = self.evaluation_results['detailed_results']
         detailed_df.to_csv(output_path, index=False)
@@ -430,34 +450,60 @@ def main():
 
     # 2. Define paths to your matcher outputs
     config_paths = {
-        'semantic': "results/semantic_focused.csv",
-        'lexical': "results/lexical_focused.csv",
-        'balanced': "results/balanced.csv"
+        'version 1': "results/hybrid_matches_trf.csv",
+        'Version 2(Matcher_Old) semantic': "results/semantic_focused.csv",
+        #'(Matcher_Old) lexical': "results/lexical_focused.csv", 
+        #'(Matcher_Old) balanced': "results/balanced.csv",
+        #'version 2': "results/efficient_matches.csv",
+        #'version 2 spacy(EfficientMatcherV1)': "results/efficient_matches_spacyV1.csv",    
+        #'version 2 st(EfficientMatcherV1)': "results/efficient_matches_stV1.csv",          
+        'version 3 (OptimizedMatcher)': "results/optimized_matches.csv",
+        'version 4 spacy(EfficientMatcherV2)': "results/efficient_matches_spacy.csv",    
+        'version 4 st(EfficientMatcherV2)': "results/efficient_matches_st.csv",
+        'version 5 (Hybrid Enhanced)': "results/hybrid_enhanced_matches.csv",     
+        'version 6 (Final Clean)': "results/final_clean_matches.csv",
     }
+
+    # Create evaluation output directory
+    eval_output_dir = Path("evaluation_results")
+    eval_output_dir.mkdir(exist_ok=True)
 
     config_predictions = {}
     for config_name, path in config_paths.items():
         try:
             df = pd.read_csv(path)
-
-            # Normalize predicted activity names to match manual format
-            df["Activity Name"] = df["Activity Name"].str.replace(r'\(context.*?\)', '', regex=True).str.strip().str.lower()
-
             config_predictions[config_name] = df
+            print(f"✓ Loaded {config_name}: {len(df)} predictions")
         except Exception as e:
-            logger.error(f"Error loading {config_name} predictions: {e}")
+            print(f"✗ Error loading {config_name} predictions from {path}: {e}")
 
     # 3. Evaluate each configuration individually
     for name, df in config_predictions.items():
         print(f"\n=== Evaluation: {name.upper()} Configuration ===")
         evaluator.evaluate_predictions(df)
         evaluator.print_evaluation_summary()
-        evaluator.plot_evaluation_metrics(f"evaluation_plot_{name}.png")
-        evaluator.save_detailed_results(f"evaluation_details_{name}.csv")
+        
+        # Save plots and details to subfolder
+        safe_name = name.replace(" ", "_").replace("/", "_")
+        plot_path = eval_output_dir / f"plot_{safe_name}.png"
+        details_path = eval_output_dir / f"details_{safe_name}.csv"
+        
+        evaluator.plot_evaluation_metrics(str(plot_path), config_name=name)
+        evaluator.save_detailed_results(str(details_path))
 
     # 4. Compare all configurations side-by-side
-    print("\n=== Comparing Configurations ===")
-    evaluator.compare_configurations(config_predictions, metric='f1_at_5')
+    if len(config_predictions) > 1:
+        print("\n=== Comparing Configurations ===")
+        comparison_df = evaluator.compare_configurations(config_predictions, metric='f1_at_5')
+        
+        # Save comparison results
+        comparison_path = eval_output_dir / "configuration_comparison.csv"
+        comparison_df.to_csv(comparison_path, index=False)
+        print(f"\nComparison results saved to: {comparison_path}")
+    else:
+        print("\nNeed multiple configurations to compare.")
+
+    print(f"\nAll evaluation results saved to: {eval_output_dir}")
 
 
 if __name__ == "__main__":
