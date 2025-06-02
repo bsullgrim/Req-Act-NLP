@@ -1,7 +1,6 @@
 """
 Enhanced Workflow Matcher with Final Clean Matcher Integration
-Extends the FinalCleanMatcher to support internal engineering workflow 
-for dependency evaluation and team handoff with full explainability
+Clean, well-organized version with requirement quality analysis and full explainability
 """
 
 import pandas as pd
@@ -17,8 +16,9 @@ from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
 import re
 
-# Import the enhanced matcher
-from final_clean_matcher import FinalCleanMatcher, MatchExplanation
+# Import the enhanced matcher and requirements analyzer
+from matcher import FinalCleanMatcher, MatchExplanation
+from reqGrading import RequirementAnalyzer, QualityMetrics
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class WorkflowMatchResult:
-    """Enhanced match result for workflow processing with explainability."""
+    """Enhanced match result for workflow processing with explainability and quality metrics."""
     requirement_id: str
     requirement_name: str
     requirement_text: str
@@ -43,9 +43,18 @@ class WorkflowMatchResult:
     explanation: MatchExplanation
     engineering_notes: str = ""
     review_status: str = "PENDING"
+    # Quality metrics
+    requirement_quality_score: float = 0.0
+    clarity_score: float = 0.0
+    completeness_score: float = 0.0
+    verifiability_score: float = 0.0
+    atomicity_score: float = 0.0
+    consistency_score: float = 0.0
+    quality_issues: List[str] = None
+    quality_grade: str = "Unknown"
 
 class EnhancedWorkflowMatcher(FinalCleanMatcher):
-    """Enhanced workflow matcher with explainability for engineering teams."""
+    """Enhanced workflow matcher with explainability and quality analysis for engineering teams."""
     
     def __init__(self, model_name: str = "en_core_web_trf"):
         super().__init__(model_name)
@@ -60,7 +69,61 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             'moderate': 0.4,
             'weak': 0.2
         }
+        # Initialize requirement quality analyzer
+        self.quality_analyzer = RequirementAnalyzer()
+        self.requirement_quality_cache = {}
     
+    # Quality Analysis Methods
+    def analyze_requirement_quality(self, requirement_text: str, requirement_id: str) -> Tuple[QualityMetrics, List[str]]:
+        """Analyze requirement quality and cache results."""
+        if requirement_id in self.requirement_quality_cache:
+            return self.requirement_quality_cache[requirement_id]
+        
+        issues, metrics = self.quality_analyzer.analyze_requirement(requirement_text, requirement_id)
+        self.requirement_quality_cache[requirement_id] = (metrics, issues)
+        return metrics, issues
+    
+    def determine_quality_grade(self, overall_score: float) -> str:
+        """Determine quality grade based on overall score."""
+        if overall_score >= 80:
+            return "EXCELLENT"
+        elif overall_score >= 65:
+            return "GOOD"
+        elif overall_score >= 50:
+            return "FAIR"
+        elif overall_score >= 35:
+            return "POOR"
+        else:
+            return "CRITICAL"
+    
+    def explain_poor_match_with_quality(self, match_score: float, quality_score: float, 
+                                       quality_issues: List[str]) -> str:
+        """Generate explanation for poor matches considering requirement quality."""
+        explanations = []
+        
+        if match_score < 0.4 and quality_score < 50:
+            explanations.append("Low match score likely due to poor requirement quality")
+            
+        if quality_score < 35:
+            explanations.append("CRITICAL quality issues may prevent accurate matching")
+            
+        # Identify specific quality issues that affect matching
+        matching_affecting_issues = [
+            "ambiguous term", "no measurable criteria", "missing subject", 
+            "missing verb", "missing object", "no modal verb", "vague phrase"
+        ]
+        
+        relevant_issues = []
+        for issue in quality_issues:
+            if any(affecting in issue.lower() for affecting in matching_affecting_issues):
+                relevant_issues.append(issue)
+        
+        if relevant_issues:
+            explanations.append(f"Specific issues affecting matching: {'; '.join(relevant_issues[:3])}")
+            
+        return " | ".join(explanations) if explanations else "Quality analysis available"
+
+    # Match Classification Methods
     def categorize_match(self, scores: Dict[str, float]) -> Tuple[str, str, str]:
         """Categorize match quality and determine review priority."""
         combined = scores.get('combined', 0)
@@ -96,10 +159,12 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
         
         return confidence, match_type, priority
     
+    # Workflow Processing Methods
     def generate_workflow_matches(self, matches_df: pd.DataFrame, 
                                 explanations: List[MatchExplanation]) -> List[WorkflowMatchResult]:
-        """Convert DataFrame and explanations to workflow match results."""
+        """Convert DataFrame and explanations to workflow match results with quality analysis."""
         workflow_matches = []
+        seen_pairs = set()  # Track requirement-activity pairs to avoid duplicates
         
         # Create lookup for explanations by requirement+activity
         explanation_lookup = {}
@@ -107,7 +172,33 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             key = f"{exp.requirement_id}||{exp.activity_name}"
             explanation_lookup[key] = exp
         
+        logger.info("Analyzing requirement quality for workflow matches...")
+        
         for _, row in matches_df.iterrows():
+            # Create unique pair identifier
+            pair_key = (str(row['ID']), str(row['Activity Name']))
+            
+            # Skip if we've already seen this requirement-activity pair
+            if pair_key in seen_pairs:
+                continue
+            seen_pairs.add(pair_key)
+            
+            # Analyze requirement quality
+            req_id = str(row['ID'])
+            req_text = str(row['Requirement Text'])
+            quality_metrics, quality_issues = self.analyze_requirement_quality(req_text, req_id)
+            
+            # Calculate overall quality score
+            overall_quality = (
+                quality_metrics.clarity_score * 0.25 +
+                quality_metrics.completeness_score * 0.25 +
+                quality_metrics.verifiability_score * 0.2 +
+                quality_metrics.atomicity_score * 0.2 +
+                quality_metrics.consistency_score * 0.1
+            )
+            
+            quality_grade = self.determine_quality_grade(overall_quality)
+            
             # Get explanation for this match
             lookup_key = f"{row['ID']}||{row['Activity Name']}"
             explanation = explanation_lookup.get(lookup_key)
@@ -145,6 +236,14 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             
             confidence, match_type, priority = self.categorize_match(scores)
             
+            # Enhance explanation with quality analysis for poor matches
+            if row['Combined Score'] < 0.5:
+                quality_explanation = self.explain_poor_match_with_quality(
+                    row['Combined Score'], overall_quality, quality_issues
+                )
+                if quality_explanation and quality_explanation != "Quality analysis available":
+                    explanation.semantic_explanation += f" | Quality Impact: {quality_explanation}"
+            
             workflow_match = WorkflowMatchResult(
                 requirement_id=str(row['ID']),
                 requirement_name=str(row.get('Requirement Name', '')),
@@ -159,12 +258,24 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
                 confidence_level=confidence,
                 match_type=match_type,
                 review_priority=priority,
-                explanation=explanation
+                explanation=explanation,
+                # Quality metrics
+                requirement_quality_score=overall_quality,
+                clarity_score=quality_metrics.clarity_score,
+                completeness_score=quality_metrics.completeness_score,
+                verifiability_score=quality_metrics.verifiability_score,
+                atomicity_score=quality_metrics.atomicity_score,
+                consistency_score=quality_metrics.consistency_score,
+                quality_issues=quality_issues,
+                quality_grade=quality_grade
             )
             workflow_matches.append(workflow_match)
         
+        logger.info(f"Generated {len(workflow_matches)} unique workflow matches from {len(matches_df)} total matches")
+        logger.info(f"Quality analysis: {len([m for m in workflow_matches if m.quality_grade in ['POOR', 'CRITICAL']])} requirements need quality improvement")
         return workflow_matches
 
+    # Excel Generation Methods
     def create_engineering_review_package(self, matches_df: pd.DataFrame, 
                                         explanations: List[MatchExplanation],
                                         output_dir: str = "engineering_review") -> Dict[str, str]:
@@ -201,9 +312,9 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
         self._create_enhanced_summary_dashboard(workflow_matches, summary_file)
         files_created['summary_dashboard'] = str(summary_file)
         
-        # 6. Updated workflow guide
-        guide_file = output_path / "workflow_guide_explained.md"
-        self._create_enhanced_workflow_guide(guide_file)
+        # 6. Quick reference guide
+        guide_file = output_path / "workflow_guide_quick_reference.md"
+        self._create_quick_reference_guide(guide_file)
         files_created['workflow_guide'] = str(guide_file)
         
         logger.info(f"Created enhanced engineering review package in {output_dir}")
@@ -259,12 +370,14 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
     
     def _populate_enhanced_excel_sheet(self, ws, matches: List[WorkflowMatchResult], 
                                      header_fill, header_font, row_fill):
-        """Populate Excel sheet with enhanced match data and explanations."""
+        """Populate Excel sheet with enhanced match data, explanations, and quality analysis."""
         headers = [
-            "Req ID", "Requirement Name", "Activity Name", "Combined Score",
+            "Req ID", "Requirement Name", "Requirement Text", "Activity Name", "Combined Score",
             "Confidence", "Match Type", "Priority", "Semantic Score", "BM25 Score",
             "Syntactic Score", "Domain Score", "Query Expansion", "Match Quality",
-            "Semantic Explanation", "Key Evidence", "Shared Terms", 
+            "Quality Grade", "Quality Score", "Clarity", "Completeness", "Verifiability", 
+            "Atomicity", "Consistency", "Quality Issues", "Semantic Explanation", 
+            "BM25 Explanation", "Domain Explanation", "Quality Impact", "Shared Terms", 
             "Engineer Review", "Status", "Notes"
         ]
         
@@ -275,68 +388,105 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             cell.font = header_font
             cell.alignment = Alignment(horizontal="center")
         
-        # Add data
-        for row, match in enumerate(matches, 2):
+        # Remove duplicates while preserving order
+        seen_pairs = set()
+        unique_matches = []
+        for match in matches:
+            pair_key = (match.requirement_id, match.activity_name)
+            if pair_key not in seen_pairs:
+                seen_pairs.add(pair_key)
+                unique_matches.append(match)
+        
+        # Add data with full text, explanations, and quality analysis
+        for row, match in enumerate(unique_matches, 2):
             ws.cell(row=row, column=1, value=match.requirement_id)
-            ws.cell(row=row, column=2, value=self._truncate_text(match.requirement_name, 40))
-            ws.cell(row=row, column=3, value=self._truncate_text(match.activity_name, 40))
-            ws.cell(row=row, column=4, value=round(match.combined_score, 3))
-            ws.cell(row=row, column=5, value=match.confidence_level)
-            ws.cell(row=row, column=6, value=match.match_type)
-            ws.cell(row=row, column=7, value=match.review_priority)
-            ws.cell(row=row, column=8, value=round(match.semantic_score, 3))
-            ws.cell(row=row, column=9, value=round(match.bm25_score, 3))
-            ws.cell(row=row, column=10, value=round(match.syntactic_score, 3))
-            ws.cell(row=row, column=11, value=round(match.domain_score, 3))
-            ws.cell(row=row, column=12, value=round(match.query_expansion_score, 3))
-            ws.cell(row=row, column=13, value=match.explanation.match_quality)
-            ws.cell(row=row, column=14, value=self._truncate_text(match.explanation.semantic_explanation, 60))
-            ws.cell(row=row, column=15, value=self._create_key_evidence_summary(match.explanation))
-            ws.cell(row=row, column=16, value=", ".join(match.explanation.shared_terms[:3]))
-            ws.cell(row=row, column=17, value="")  # Engineer Review (to be filled)
-            ws.cell(row=row, column=18, value="PENDING")  # Status
-            ws.cell(row=row, column=19, value="")  # Notes
+            ws.cell(row=row, column=2, value=match.requirement_name)
+            ws.cell(row=row, column=3, value=match.requirement_text)  # Full text
+            ws.cell(row=row, column=4, value=match.activity_name)  # Full text
+            ws.cell(row=row, column=5, value=round(match.combined_score, 3))
+            ws.cell(row=row, column=6, value=match.confidence_level)
+            ws.cell(row=row, column=7, value=match.match_type)
+            ws.cell(row=row, column=8, value=match.review_priority)
+            ws.cell(row=row, column=9, value=round(match.semantic_score, 3))
+            ws.cell(row=row, column=10, value=round(match.bm25_score, 3))
+            ws.cell(row=row, column=11, value=round(match.syntactic_score, 3))
+            ws.cell(row=row, column=12, value=round(match.domain_score, 3))
+            ws.cell(row=row, column=13, value=round(match.query_expansion_score, 3))
+            ws.cell(row=row, column=14, value=match.explanation.match_quality)
+            # Quality metrics
+            ws.cell(row=row, column=15, value=match.quality_grade)
+            ws.cell(row=row, column=16, value=round(match.requirement_quality_score, 1))
+            ws.cell(row=row, column=17, value=round(match.clarity_score, 1))
+            ws.cell(row=row, column=18, value=round(match.completeness_score, 1))
+            ws.cell(row=row, column=19, value=round(match.verifiability_score, 1))
+            ws.cell(row=row, column=20, value=round(match.atomicity_score, 1))
+            ws.cell(row=row, column=21, value=round(match.consistency_score, 1))
+            ws.cell(row=row, column=22, value="; ".join(match.quality_issues[:3]) if match.quality_issues else "None")
+            # Explanations
+            ws.cell(row=row, column=23, value=match.explanation.semantic_explanation)  # Full explanation
+            ws.cell(row=row, column=24, value=match.explanation.bm25_explanation)  # Full explanation
+            ws.cell(row=row, column=25, value=match.explanation.domain_explanation)  # Full explanation
+            ws.cell(row=row, column=26, value=self.explain_poor_match_with_quality(
+                match.combined_score, match.requirement_quality_score, match.quality_issues))
+            ws.cell(row=row, column=27, value=", ".join(match.explanation.shared_terms))
+            ws.cell(row=row, column=28, value="")  # Engineer Review (to be filled)
+            ws.cell(row=row, column=29, value="PENDING")  # Status
+            ws.cell(row=row, column=30, value="")  # Notes
             
-            # Apply row fill
+            # Apply row fill with quality-based coloring
+            quality_fill = row_fill
+            if match.quality_grade in ['POOR', 'CRITICAL']:
+                quality_fill = PatternFill(start_color="FFE4E1", end_color="FFE4E1", fill_type="solid")  # Light red
+            elif match.quality_grade == 'FAIR':
+                quality_fill = PatternFill(start_color="FFF8DC", end_color="FFF8DC", fill_type="solid")  # Light yellow
+            
             for col in range(1, len(headers) + 1):
-                ws.cell(row=row, column=col).fill = row_fill
+                ws.cell(row=row, column=col).fill = quality_fill
         
-        # Auto-adjust column widths
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 60)
-            ws.column_dimensions[column_letter].width = adjusted_width
-    
-    def _create_key_evidence_summary(self, explanation: MatchExplanation) -> str:
-        """Create a concise summary of key evidence for Excel display."""
-        evidence = []
+        # Set optimal column widths for readability including quality columns
+        column_widths = {
+            'A': 12,  # Req ID
+            'B': 25,  # Requirement Name
+            'C': 80,  # Requirement Text (wide for full text)
+            'D': 50,  # Activity Name
+            'E': 15,  # Combined Score
+            'F': 12,  # Confidence
+            'G': 12,  # Match Type
+            'H': 18,  # Priority
+            'I': 12,  # Semantic Score
+            'J': 12,  # BM25 Score
+            'K': 12,  # Syntactic Score
+            'L': 12,  # Domain Score
+            'M': 15,  # Query Expansion
+            'N': 15,  # Match Quality
+            'O': 15,  # Quality Grade
+            'P': 12,  # Quality Score
+            'Q': 12,  # Clarity
+            'R': 15,  # Completeness
+            'S': 15,  # Verifiability
+            'T': 12,  # Atomicity
+            'U': 12,  # Consistency
+            'V': 60,  # Quality Issues
+            'W': 60,  # Semantic Explanation
+            'X': 60,  # BM25 Explanation
+            'Y': 60,  # Domain Explanation
+            'Z': 60,  # Quality Impact
+            'AA': 40, # Shared Terms
+            'AB': 20, # Engineer Review
+            'AC': 15, # Status
+            'AD': 40  # Notes
+        }
         
-        if explanation.shared_terms:
-            evidence.append(f"Shared: {', '.join(explanation.shared_terms[:2])}")
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
         
-        if "High" in explanation.semantic_explanation:
-            evidence.append("High semantic similarity")
+        # Enable text wrapping for text-heavy columns
+        wrap_alignment = Alignment(wrap_text=True, vertical='top')
         
-        if "domain terms" in explanation.domain_explanation and explanation.domain_score > 0.1:
-            evidence.append("Technical term match")
-            
-        if len(evidence) == 0:
-            evidence.append("See detailed explanations")
-            
-        return "; ".join(evidence)
-    
-    def _truncate_text(self, text: str, max_length: int) -> str:
-        """Truncate text for Excel display."""
-        if len(text) <= max_length:
-            return text
-        return text[:max_length-3] + "..."
+        for row in range(2, len(unique_matches) + 2):
+            # Apply text wrapping to text-heavy columns
+            for col in ['C', 'D', 'V', 'W', 'X', 'Y', 'Z', 'AA', 'AD']:  # Text columns
+                ws[f'{col}{row}'].alignment = wrap_alignment
     
     def _create_enhanced_summary_sheet(self, ws, matches: List[WorkflowMatchResult], 
                                      header_fill, header_font):
@@ -348,11 +498,13 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
         by_confidence = {}
         by_priority = {}
         by_match_quality = {}
+        by_req_quality = {}
         
         for match in matches:
             by_confidence[match.confidence_level] = by_confidence.get(match.confidence_level, 0) + 1
             by_priority[match.review_priority] = by_priority.get(match.review_priority, 0) + 1
             by_match_quality[match.explanation.match_quality] = by_match_quality.get(match.explanation.match_quality, 0) + 1
+            by_req_quality[match.quality_grade] = by_req_quality.get(match.quality_grade, 0) + 1
         
         # Write summary data
         row = 1
@@ -378,9 +530,9 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             row += 1
         
         row += 1
-        ws.cell(row=row, column=1, value="By Match Quality:").font = Font(bold=True)
+        ws.cell(row=row, column=1, value="By Requirement Quality:").font = Font(bold=True)
         row += 1
-        for quality, count in by_match_quality.items():
+        for quality, count in by_req_quality.items():
             ws.cell(row=row, column=2, value=f"{quality}: {count} ({count/total_matches*100:.1f}%)")
             row += 1
     
@@ -401,17 +553,12 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             ["", "Shows exact term matches and their importance"],
             ["", "Higher scores indicate more shared technical terms"],
             ["", ""],
-            ["Syntactic Score", "Structural similarity (grammar, dependencies)"],
-            ["", "Compares sentence structure and linguistic patterns"],
-            ["", "Useful for identifying functionally similar activities"],
-            ["", ""],
-            ["Domain Score", "Technical term overlap weighted by importance"],
-            ["", "Emphasizes domain-specific terminology"],
-            ["", "Higher scores indicate shared technical vocabulary"],
-            ["", ""],
-            ["Query Expansion", "Synonym and related term matching"],
-            ["", "Uses domain dictionary to find vocabulary variants"],
-            ["", "Helps overcome different terminology usage"],
+            ["Quality Score", "Requirement quality analysis (0-100)"],
+            ["", "EXCELLENT (80+): Well-written, clear requirements"],
+            ["", "GOOD (65-79): Good quality with minor issues"],
+            ["", "FAIR (50-64): Acceptable but needs improvement"],
+            ["", "POOR (35-49): Significant quality issues"],
+            ["", "CRITICAL (<35): Major rewrite needed"],
             ["", ""],
             ["CONFIDENCE LEVELS", ""],
             ["", ""],
@@ -419,12 +566,10 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             ["MEDIUM (0.4-0.7)", "Moderate match, requires review"],
             ["LOW (<0.4)", "Weak match, may be false positive"],
             ["", ""],
-            ["REVIEW PRIORITIES", ""],
-            ["", ""],
-            ["AUTO-APPROVE", "High confidence + strong semantic match"],
-            ["QUICK-REVIEW", "High confidence or good semantic match"],
-            ["DETAILED-REVIEW", "Medium confidence, needs thorough analysis"],
-            ["MANUAL-ANALYSIS", "Low confidence, may be false positive"]
+            ["QUALITY IMPACT", ""],
+            ["", "Poor quality requirements often lead to poor matches"],
+            ["", "Focus on improving requirement quality for better results"],
+            ["", "Critical quality issues may prevent accurate matching"]
         ]
         
         for row_idx, (col1, col2) in enumerate(guide_content, 1):
@@ -438,14 +583,15 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
         # Auto-adjust column widths
         ws.column_dimensions['A'].width = 25
         ws.column_dimensions['B'].width = 60
-    
+
+    # Output File Generation Methods
     def _create_structured_json_with_explanations(self, matches: List[WorkflowMatchResult], filepath: Path):
         """Create structured JSON with full explanations."""
         data = {
             "metadata": {
                 "generated_at": datetime.now().isoformat(),
                 "total_matches": len(matches),
-                "tool_version": "2.0_with_explanations",
+                "tool_version": "2.0_with_explanations_and_quality",
                 "confidence_thresholds": self.confidence_thresholds
             },
             "matches": []
@@ -475,12 +621,25 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
                     "review_priority": match.review_priority,
                     "match_quality": match.explanation.match_quality
                 },
+                "quality_analysis": {
+                    "overall_score": round(match.requirement_quality_score, 1),
+                    "grade": match.quality_grade,
+                    "clarity": round(match.clarity_score, 1),
+                    "completeness": round(match.completeness_score, 1),
+                    "verifiability": round(match.verifiability_score, 1),
+                    "atomicity": round(match.atomicity_score, 1),
+                    "consistency": round(match.consistency_score, 1),
+                    "issues": match.quality_issues or []
+                },
                 "explanations": {
                     "semantic": match.explanation.semantic_explanation,
                     "bm25": match.explanation.bm25_explanation,
                     "syntactic": match.explanation.syntactic_explanation,
                     "domain": match.explanation.domain_explanation,
-                    "query_expansion": match.explanation.query_expansion_explanation
+                    "query_expansion": match.explanation.query_expansion_explanation,
+                    "quality_impact": self.explain_poor_match_with_quality(
+                        match.combined_score, match.requirement_quality_score, match.quality_issues
+                    )
                 },
                 "evidence": {
                     "shared_terms": match.explanation.shared_terms,
@@ -516,6 +675,9 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
                 "Confidence": match.confidence_level,
                 "Combined_Score": round(match.combined_score, 3),
                 "Match_Quality": match.explanation.match_quality,
+                "Req_Quality_Grade": match.quality_grade,
+                "Req_Quality_Score": round(match.requirement_quality_score, 1),
+                "Quality_Issues": "; ".join(match.quality_issues[:2]) if match.quality_issues else "None",
                 "Explanation_Summary": explanation_summary,
                 "Shared_Terms": ", ".join(match.explanation.shared_terms[:3]),
                 "Assigned_Engineer": "",  # To be filled
@@ -529,76 +691,260 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
         df.to_csv(filepath, index=False)
     
     def _create_explanation_summary_html(self, matches: List[WorkflowMatchResult], filepath: Path):
-        """Create HTML summary report with explanations."""
+        """Create HTML summary report with explanations and quality analysis for ALL matches."""
+        
+        # Remove duplicates while preserving order
+        seen_pairs = set()
+        unique_matches = []
+        for match in matches:
+            pair_key = (match.requirement_id, match.activity_name)
+            if pair_key not in seen_pairs:
+                seen_pairs.add(pair_key)
+                unique_matches.append(match)
+        
+        # Sort by combined score descending
+        sorted_matches = sorted(unique_matches, key=lambda x: x.combined_score, reverse=True)
+        
+        # Quality statistics
+        quality_stats = {
+            'EXCELLENT': len([m for m in sorted_matches if m.quality_grade == 'EXCELLENT']),
+            'GOOD': len([m for m in sorted_matches if m.quality_grade == 'GOOD']),
+            'FAIR': len([m for m in sorted_matches if m.quality_grade == 'FAIR']),
+            'POOR': len([m for m in sorted_matches if m.quality_grade == 'POOR']),
+            'CRITICAL': len([m for m in sorted_matches if m.quality_grade == 'CRITICAL'])
+        }
+        
         html_content = f"""
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Dependency Analysis Explanation Summary</title>
+    <title>Complete Dependency Analysis with Quality Assessment</title>
     <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
         .header {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
         .summary-stats {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-        .match {{ border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }}
-        .match-header {{ font-weight: bold; color: #2c3e50; }}
-        .score-breakdown {{ margin: 10px 0; }}
+        .match {{ border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; page-break-inside: avoid; }}
+        .match-header {{ font-weight: bold; color: #2c3e50; margin-bottom: 10px; }}
+        .requirement-text {{ background-color: #f0f8ff; padding: 10px; border-radius: 3px; margin: 10px 0; font-style: italic; }}
+        .activity-text {{ background-color: #f0fff0; padding: 10px; border-radius: 3px; margin: 10px 0; font-weight: bold; }}
+        .score-breakdown {{ margin: 10px 0; background-color: #fafafa; padding: 10px; border-radius: 3px; }}
+        .quality-section {{ background-color: #fff3cd; padding: 10px; border-radius: 3px; margin: 10px 0; border-left: 4px solid #ffc107; }}
         .explanation {{ background-color: #f1f3f4; padding: 10px; border-left: 4px solid #4CAF50; margin: 5px 0; }}
         .high-confidence {{ border-left-color: #4CAF50; }}
         .medium-confidence {{ border-left-color: #FF9800; }}
         .low-confidence {{ border-left-color: #f44336; }}
-        .evidence {{ font-style: italic; color: #666; }}
+        .quality-excellent {{ background-color: #d4edda; }}
+        .quality-good {{ background-color: #d1ecf1; }}
+        .quality-fair {{ background-color: #fff3cd; }}
+        .quality-poor {{ background-color: #f8d7da; }}
+        .quality-critical {{ background-color: #f5c6cb; border: 2px solid #dc3545; }}
+        .evidence {{ font-style: italic; color: #666; margin: 10px 0; }}
+        .filter-controls {{ margin: 20px 0; padding: 15px; background-color: #e9ecef; border-radius: 5px; }}
+        .filter-button {{ background-color: #007bff; color: white; border: none; padding: 8px 15px; margin: 5px; border-radius: 3px; cursor: pointer; }}
+        .filter-button:hover {{ background-color: #0056b3; }}
+        .filter-button.active {{ background-color: #28a745; }}
+        .stats-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }}
+        .stat-card {{ background-color: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd; text-align: center; }}
+        .quality-badge {{ display: inline-block; padding: 4px 8px; border-radius: 3px; font-size: 0.8em; font-weight: bold; }}
+        .badge-excellent {{ background-color: #28a745; color: white; }}
+        .badge-good {{ background-color: #17a2b8; color: white; }}
+        .badge-fair {{ background-color: #ffc107; color: black; }}
+        .badge-poor {{ background-color: #fd7e14; color: white; }}
+        .badge-critical {{ background-color: #dc3545; color: white; }}
+        .quality-details {{ font-size: 0.9em; margin: 5px 0; }}
     </style>
+    <script>
+        function filterMatches(criteria, value) {{
+            const matches = document.querySelectorAll('.match');
+            const buttons = document.querySelectorAll('.filter-button');
+            
+            // Reset button states
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            if (value === 'all') {{
+                matches.forEach(match => match.style.display = 'block');
+                document.querySelector('[data-filter="all"]').classList.add('active');
+            }} else {{
+                matches.forEach(match => {{
+                    const matchValue = match.dataset[criteria];
+                    match.style.display = matchValue === value ? 'block' : 'none';
+                }});
+                document.querySelector(`[data-filter="${{value}}"]`).classList.add('active');
+            }}
+        }}
+    </script>
 </head>
 <body>
     <div class="header">
-        <h1>Dependency Analysis Explanation Summary</h1>
+        <h1>Complete Dependency Analysis with Quality Assessment</h1>
         <p>Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+        <p>Total Matches: {len(sorted_matches)} (duplicates removed)</p>
     </div>
     
     <div class="summary-stats">
         <h2>Summary Statistics</h2>
-        <p><strong>Total Matches:</strong> {len(matches)}</p>
-        <p><strong>Requirements Covered:</strong> {len(set(m.requirement_id for m in matches))}</p>
-        <p><strong>Average Combined Score:</strong> {np.mean([m.combined_score for m in matches]):.3f}</p>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>{len(sorted_matches)}</h3>
+                <p>Total Unique Matches</p>
+            </div>
+            <div class="stat-card">
+                <h3>{len(set(m.requirement_id for m in sorted_matches))}</h3>
+                <p>Requirements Covered</p>
+            </div>
+            <div class="stat-card">
+                <h3>{np.mean([m.combined_score for m in sorted_matches]):.3f}</h3>
+                <p>Average Match Score</p>
+            </div>
+            <div class="stat-card">
+                <h3>{np.mean([m.requirement_quality_score for m in sorted_matches]):.1f}</h3>
+                <p>Average Quality Score</p>
+            </div>
+            <div class="stat-card">
+                <h3>{len([m for m in sorted_matches if m.confidence_level == 'HIGH'])}</h3>
+                <p>High Confidence Matches</p>
+            </div>
+            <div class="stat-card">
+                <h3>{quality_stats['POOR'] + quality_stats['CRITICAL']}</h3>
+                <p>Requirements Needing Quality Improvement</p>
+            </div>
+        </div>
+        
+        <h3>Requirement Quality Distribution:</h3>
+        <div class="stats-grid">
+            <div class="stat-card quality-excellent">
+                <h3>{quality_stats['EXCELLENT']}</h3>
+                <p>Excellent Quality</p>
+            </div>
+            <div class="stat-card quality-good">
+                <h3>{quality_stats['GOOD']}</h3>
+                <p>Good Quality</p>
+            </div>
+            <div class="stat-card quality-fair">
+                <h3>{quality_stats['FAIR']}</h3>
+                <p>Fair Quality</p>
+            </div>
+            <div class="stat-card quality-poor">
+                <h3>{quality_stats['POOR']}</h3>
+                <p>Poor Quality</p>
+            </div>
+            <div class="stat-card quality-critical">
+                <h3>{quality_stats['CRITICAL']}</h3>
+                <p>Critical Quality Issues</p>
+            </div>
+        </div>
     </div>
     
-    <h2>Top Matches with Explanations</h2>
+    <div class="filter-controls">
+        <h3>Filter by Review Priority:</h3>
+        <button class="filter-button active" data-filter="all" onclick="filterMatches('priority', 'all')">Show All</button>
+        <button class="filter-button" data-filter="AUTO-APPROVE" onclick="filterMatches('priority', 'AUTO-APPROVE')">Auto-Approve ({len([m for m in sorted_matches if m.review_priority == 'AUTO-APPROVE'])})</button>
+        <button class="filter-button" data-filter="QUICK-REVIEW" onclick="filterMatches('priority', 'QUICK-REVIEW')">Quick Review ({len([m for m in sorted_matches if m.review_priority == 'QUICK-REVIEW'])})</button>
+        <button class="filter-button" data-filter="DETAILED-REVIEW" onclick="filterMatches('priority', 'DETAILED-REVIEW')">Detailed Review ({len([m for m in sorted_matches if m.review_priority == 'DETAILED-REVIEW'])})</button>
+        <button class="filter-button" data-filter="MANUAL-ANALYSIS" onclick="filterMatches('priority', 'MANUAL-ANALYSIS')">Manual Analysis ({len([m for m in sorted_matches if m.review_priority == 'MANUAL-ANALYSIS'])})</button>
+        
+        <h3>Filter by Quality Grade:</h3>
+        <button class="filter-button" data-filter="EXCELLENT" onclick="filterMatches('quality', 'EXCELLENT')">Excellent ({quality_stats['EXCELLENT']})</button>
+        <button class="filter-button" data-filter="GOOD" onclick="filterMatches('quality', 'GOOD')">Good ({quality_stats['GOOD']})</button>
+        <button class="filter-button" data-filter="FAIR" onclick="filterMatches('quality', 'FAIR')">Fair ({quality_stats['FAIR']})</button>
+        <button class="filter-button" data-filter="POOR" onclick="filterMatches('quality', 'POOR')">Poor ({quality_stats['POOR']})</button>
+        <button class="filter-button" data-filter="CRITICAL" onclick="filterMatches('quality', 'CRITICAL')">Critical ({quality_stats['CRITICAL']})</button>
+    </div>
+    
+    <h2>All Matches with Quality Analysis and Detailed Explanations</h2>
 """
         
-        # Show top 10 matches
-        top_matches = sorted(matches, key=lambda x: x.combined_score, reverse=True)[:10]
-        
-        for i, match in enumerate(top_matches, 1):
+        # Show ALL matches with quality analysis
+        for i, match in enumerate(sorted_matches, 1):
             confidence_class = match.confidence_level.lower() + "-confidence"
+            quality_class = f"quality-{match.quality_grade.lower()}"
+            quality_badge_class = f"badge-{match.quality_grade.lower()}"
+            
+            # Determine if quality is affecting the match
+            quality_impact = ""
+            if match.combined_score < 0.5 and match.requirement_quality_score < 60:
+                quality_impact = "Poor match score may be due to requirement quality issues"
+            elif match.requirement_quality_score < 40:
+                quality_impact = "Critical quality issues may prevent accurate matching"
             
             html_content += f"""
-    <div class="match {confidence_class}">
+    <div class="match {confidence_class} {quality_class}" id="match-{i}" data-priority="{match.review_priority}" data-quality="{match.quality_grade}">
         <div class="match-header">
             Match {i}: {match.requirement_id} → {match.activity_name}
+            <span class="quality-badge {quality_badge_class}">{match.quality_grade}</span>
         </div>
+        
+        <div class="requirement-text">
+            <strong>Requirement:</strong> {match.requirement_text}
+        </div>
+        
+        <div class="activity-text">
+            <strong>Activity:</strong> {match.activity_name}
+        </div>
+        
         <div class="score-breakdown">
-            <strong>Combined Score:</strong> {match.combined_score:.3f} 
+            <strong>Match Score:</strong> {match.combined_score:.3f} 
             | <strong>Confidence:</strong> {match.confidence_level}
-            | <strong>Quality:</strong> {match.explanation.match_quality}
+            | <strong>Priority:</strong> {match.review_priority}
+            | <strong>Match Quality:</strong> {match.explanation.match_quality}
+            <br>
+            <strong>Component Scores:</strong> 
+            Semantic: {match.semantic_score:.3f} | 
+            BM25: {match.bm25_score:.3f} | 
+            Syntactic: {match.syntactic_score:.3f} | 
+            Domain: {match.domain_score:.3f} | 
+            Query Expansion: {match.query_expansion_score:.3f}
+        </div>
+        
+        <div class="quality-section">
+            <strong>Requirement Quality Analysis:</strong>
+            <div class="quality-details">
+                <strong>Overall Quality Score:</strong> {match.requirement_quality_score:.1f}/100 
+                | <strong>Grade:</strong> {match.quality_grade}
+            </div>
+            <div class="quality-details">
+                <strong>Quality Breakdown:</strong> 
+                Clarity: {match.clarity_score:.1f} | 
+                Completeness: {match.completeness_score:.1f} | 
+                Verifiability: {match.verifiability_score:.1f} | 
+                Atomicity: {match.atomicity_score:.1f} | 
+                Consistency: {match.consistency_score:.1f}
+            </div>
+            {f'<div class="quality-details"><strong>Quality Issues:</strong> {"; ".join(match.quality_issues[:3])}</div>' if match.quality_issues else ''}
+            {f'<div class="quality-details" style="color: #d63384;"><strong>{quality_impact}</strong></div>' if quality_impact else ''}
         </div>
         
         <div class="explanation">
-            <strong>Semantic:</strong> {match.explanation.semantic_explanation}
+            <strong>Semantic Analysis:</strong> {match.explanation.semantic_explanation}
         </div>
         
         <div class="explanation">
-            <strong>Term Matching:</strong> {match.explanation.bm25_explanation}
+            <strong>Term Matching (BM25):</strong> {match.explanation.bm25_explanation}
+        </div>
+        
+        <div class="explanation">
+            <strong>Structural Analysis:</strong> {match.explanation.syntactic_explanation}
         </div>
         
         <div class="explanation">
             <strong>Domain Analysis:</strong> {match.explanation.domain_explanation}
         </div>
         
-        {f'<div class="evidence">Shared Terms: {", ".join(match.explanation.shared_terms)}</div>' if match.explanation.shared_terms else ''}
+        <div class="explanation">
+            <strong>Query Expansion:</strong> {match.explanation.query_expansion_explanation}
+        </div>
+        
+        {f'<div class="evidence">Shared Terms: {", ".join(match.explanation.shared_terms)}</div>' if match.explanation.shared_terms else '<div class="evidence">No shared terms identified</div>'}
+        
+        {f'<div class="evidence"><strong>Quality Impact Analysis:</strong> {self.explain_poor_match_with_quality(match.combined_score, match.requirement_quality_score, match.quality_issues)}</div>' if match.combined_score < 0.6 else ''}
     </div>
 """
         
         html_content += """
+    <script>
+        // Initialize with all matches shown
+        filterMatches('priority', 'all');
+    </script>
 </body>
 </html>
 """
@@ -607,31 +953,19 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
             f.write(html_content)
     
     def _create_enhanced_summary_dashboard(self, matches: List[WorkflowMatchResult], filepath: Path):
-        """Create enhanced summary data for dashboard visualization."""
-        # Calculate explanation-based metrics
-        explanation_metrics = {
-            "semantic_distribution": {},
-            "match_quality_distribution": {},
-            "evidence_strength": {}
-        }
+        """Create enhanced summary data for dashboard visualization with quality metrics."""
+        # Calculate quality impact insights
+        poor_quality_reqs = [m for m in matches if m.requirement_quality_score < 50]
+        poor_matches = [m for m in matches if m.combined_score < 0.4]
+        poor_quality_and_match = [m for m in matches if m.requirement_quality_score < 50 and m.combined_score < 0.4]
         
-        for match in matches:
-            # Semantic similarity distribution
-            level = match.explanation.semantic_similarity_level
-            explanation_metrics["semantic_distribution"][level] = explanation_metrics["semantic_distribution"].get(level, 0) + 1
-            
-            # Match quality distribution
-            quality = match.explanation.match_quality
-            explanation_metrics["match_quality_distribution"][quality] = explanation_metrics["match_quality_distribution"].get(quality, 0) + 1
-            
-            # Evidence strength (based on shared terms)
-            if len(match.explanation.shared_terms) >= 3:
-                evidence_level = "Strong"
-            elif len(match.explanation.shared_terms) >= 1:
-                evidence_level = "Moderate"
-            else:
-                evidence_level = "Weak"
-            explanation_metrics["evidence_strength"][evidence_level] = explanation_metrics["evidence_strength"].get(evidence_level, 0) + 1
+        # Quality vs Match Score correlation analysis
+        quality_match_correlation = {
+            "high_quality_good_match": len([m for m in matches if m.requirement_quality_score >= 65 and m.combined_score >= 0.6]),
+            "high_quality_poor_match": len([m for m in matches if m.requirement_quality_score >= 65 and m.combined_score < 0.6]),
+            "poor_quality_good_match": len([m for m in matches if m.requirement_quality_score < 65 and m.combined_score >= 0.6]),
+            "poor_quality_poor_match": len([m for m in matches if m.requirement_quality_score < 65 and m.combined_score < 0.6])
+        }
         
         summary = {
             "overview": {
@@ -640,7 +974,9 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
                 "medium_confidence": len([m for m in matches if m.confidence_level == 'MEDIUM']),
                 "low_confidence": len([m for m in matches if m.confidence_level == 'LOW']),
                 "avg_combined_score": np.mean([m.combined_score for m in matches]),
-                "avg_semantic_score": np.mean([m.semantic_score for m in matches])
+                "avg_semantic_score": np.mean([m.semantic_score for m in matches]),
+                "avg_quality_score": np.mean([m.requirement_quality_score for m in matches]),
+                "requirements_needing_quality_improvement": len([m for m in matches if m.quality_grade in ['POOR', 'CRITICAL']])
             },
             "workflow_distribution": {
                 "auto_approve": len([m for m in matches if m.review_priority == 'AUTO-APPROVE']),
@@ -656,177 +992,77 @@ class EnhancedWorkflowMatcher(FinalCleanMatcher):
                     for priority in set(m.review_priority for m in matches)
                 }
             },
-            "explanation_metrics": explanation_metrics,
+            "quality_analysis": {
+                "quality_distribution": {
+                    grade: len([m for m in matches if m.quality_grade == grade])
+                    for grade in ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'CRITICAL']
+                },
+                "quality_match_correlation": quality_match_correlation,
+                "quality_impact_insights": {
+                    "poor_quality_requirements": len(poor_quality_reqs),
+                    "poor_matches": len(poor_matches),
+                    "poor_quality_causing_poor_matches": len(poor_quality_and_match),
+                    "quality_impact_percentage": (len(poor_quality_and_match) / max(len(poor_matches), 1)) * 100
+                },
+                "avg_quality_by_grade": {
+                    grade: np.mean([m.requirement_quality_score for m in matches if m.quality_grade == grade])
+                    for grade in set(m.quality_grade for m in matches) if grade != 'Unknown'
+                }
+            },
             "score_distributions": {
                 "semantic_scores": [m.semantic_score for m in matches],
                 "bm25_scores": [m.bm25_score for m in matches],
                 "domain_scores": [m.domain_score for m in matches],
-                "combined_scores": [m.combined_score for m in matches]
+                "combined_scores": [m.combined_score for m in matches],
+                "quality_scores": [m.requirement_quality_score for m in matches]
             }
         }
         
         with open(filepath, 'w') as f:
             json.dump(summary, f, indent=2)
     
-    def _create_enhanced_workflow_guide(self, filepath: Path):
-        """Create enhanced workflow guide with explanation information."""
-        guide_content = """# Enhanced Dependency Analysis Workflow Guide
+    def _create_quick_reference_guide(self, filepath: Path):
+        """Create quick reference guide with quality information."""
+        guide_content = """# Enhanced Dependency Analysis - Quick Reference Guide
 
-## Overview
-This package contains automated dependency analysis results with detailed explanations for each match decision.
+## Quality Grades:
+- **EXCELLENT (80+)**: Ready for matching and approval
+- **GOOD (65-79)**: Minor issues, safe to proceed  
+- **FAIR (50-64)**: Some improvements recommended
+- **POOR (35-49)**: Significant issues, review carefully
+- **CRITICAL (<35)**: Rewrite required before approval
 
-## File Structure
-- `dependency_review_workbook_explained.xlsx`: Main review workbook with explanations
-- `matches_with_explanations.json`: Machine-readable data with full explanations
-- `action_items_explained.csv`: Project management tracking with explanation summaries
-- `explanation_summary.html`: Visual summary report with top matches explained
-- `match_summary_enhanced.json`: Dashboard data with explanation metrics
-
-## Enhanced Review Process
-
-### 1. Auto-Approve Sheet
-- **High confidence matches (>70%) with strong semantic similarity**
-- **Key indicators**: "Very High" or "High" semantic similarity, multiple shared terms
-- **Explanation focus**: Verify the semantic explanation makes sense
-- **Estimated time**: 15 minutes per match
-
-### 2. Quick Review Sheet
-- **High confidence OR medium confidence with good semantic match**
-- **Key indicators**: Moderate to high semantic similarity, some shared technical terms
-- **Explanation focus**: Check BM25 and domain explanations for technical alignment
-- **Estimated time**: 30 minutes per match
-
-### 3. Detailed Review Sheet
-- **Medium confidence matches requiring thorough analysis**
-- **Key indicators**: Mixed signals across different scoring components
-- **Explanation focus**: Analyze all explanation components, especially syntactic patterns
-- **Estimated time**: 2 hours per match
-
-### 4. Manual Analysis Sheet
-- **Low confidence matches that may be false positives**
-- **Key indicators**: Low semantic similarity, few shared terms, weak explanations
-- **Explanation focus**: Determine if match has any validity despite low scores
-- **Estimated time**: 4 hours per match
-
-## Explanation Components Guide
-
-### Semantic Explanation
-- **Very High (>0.7)**: Strong conceptual match, likely correct dependency
-- **High (0.5-0.7)**: Good conceptual alignment, review context
-- **Medium (0.3-0.5)**: Moderate similarity, may need domain expert review
-- **Low (<0.3)**: Weak conceptual connection, likely false positive
-
-### BM25 Explanation
-- Shows exact term matches and their statistical importance
-- Look for meaningful technical terms, not just common words
-- Higher scores with technical terms indicate stronger matches
-
-### Domain Explanation
-- Highlights shared technical terminology
-- Focus on domain-specific terms with high weights
-- Empty explanations may indicate vocabulary mismatch
-
-### Syntactic Explanation
-- Compares sentence structure and linguistic patterns
-- Useful for identifying functionally similar activities
-- Higher scores suggest similar action patterns
-
-### Query Expansion Explanation
-- Shows synonym and related term matching
-- Helps identify matches despite different terminology
-- Review expanded terms for domain appropriateness
-
-## Using the Explanation Data
-
-### In Excel Workbook
-1. **Key Evidence column**: Quick summary of main match indicators
-2. **Explanation columns**: Detailed breakdowns for each scoring component
-3. **Shared Terms column**: Direct vocabulary overlap
-4. **Match Quality**: Overall assessment (EXCELLENT/GOOD/MODERATE/WEAK)
-
-### In JSON Data
-- Full programmatic access to all explanations
-- Suitable for integration with other tools
-- Contains structured evidence and reasoning
-
-### In HTML Report
-- Visual overview of top matches
-- Color-coded by confidence level
-- Easy sharing with stakeholders
-
-## Review Workflow
-
-1. **Start with Excel workbook** - gives best overview and input capability
-2. **Use explanation columns** to understand why each match was suggested
-3. **Cross-reference with HTML report** for visual confirmation of top matches
-4. **Update status and notes** directly in Excel
-5. **Export decisions** using action items CSV for project tracking
-
-## Quality Indicators
-
-### Strong Match Indicators
-- Multiple shared technical terms
-- High semantic similarity with clear explanation
-- Domain-specific term overlap
-- Consistent scores across components
-
-### Weak Match Indicators
-- No shared meaningful terms
-- Low semantic similarity
-- Generic or common-word overlap only
-- Inconsistent scores across components
-
-## Decision Guidelines
+## Quality-Enhanced Decision Guidelines:
 
 ### Approve if:
-- Semantic explanation makes logical sense
-- Multiple technical terms are shared
-- Domain explanation shows relevant technical overlap
-- Match quality is EXCELLENT or GOOD
+- Good match score + GOOD/EXCELLENT quality
+- Multiple shared terms + well-written requirement
+- Strong semantic similarity + no critical quality issues
 
 ### Review Further if:
-- Mixed signals across explanation components
-- Semantic similarity is moderate but term overlap is low
-- Domain explanation is weak but other indicators are strong
-- Match quality is MODERATE
+- Good match + FAIR quality (may improve with enhancement)
+- Mixed scoring signals + moderate quality issues
+- Moderate similarity + vocabulary mismatch vs quality issue
 
-### Reject if:
-- No meaningful shared technical terms
-- Semantic explanation shows conceptual mismatch
-- All explanation components are weak
-- Match quality is WEAK with no redeeming factors
+### Reject/Rewrite if:
+- CRITICAL quality grade (regardless of match score)
+- POOR quality + low match (quality-caused mismatch)
+- No shared terms + significant quality issues
 
-## Integration with Engineering Process
+## Quality Impact on Matching:
+- **High Quality + Poor Match**: Algorithm/vocabulary limitation
+- **Poor Quality + Poor Match**: Requirement needs rewriting
+- **Poor Quality + Good Match**: Investigate for false positive
+- **High Quality + Good Match**: High confidence approval
 
-1. **Requirements Traceability**: Use approved matches for formal traceability matrix
-2. **Architecture Review**: Reference explanations in design review meetings  
-3. **Test Planning**: Use matched activities for test case derivation
-4. **Documentation**: Include match reasoning in requirement specifications
-5. **Change Impact**: Re-run analysis when requirements change
+## File Descriptions:
+- **Excel Workbook**: Main review interface with all data and explanations
+- **HTML Report**: Visual summary with filtering capabilities
+- **JSON Data**: Machine-readable format for integration
+- **Action Items CSV**: Project management tracking
+- **Summary Dashboard**: Analytics and metrics
 
-## Troubleshooting
-
-### If explanations seem unclear:
-- Check the original requirement and activity texts for context
-- Review the explanation guide sheet in Excel workbook
-- Consult domain experts for technical term validation
-
-### If scores seem inconsistent:
-- Different components measure different aspects of similarity
-- Low semantic with high BM25 may indicate technical term match without conceptual alignment
-- High semantic with low BM25 may indicate conceptual match with different terminology
-
-### If no good matches found:
-- Requirement may be too abstract or implementation-specific
-- Activity descriptions may need more detail
-- Consider if requirement should be decomposed
-
-## Support
-
-For questions about the matching algorithm or explanations, refer to:
-- Explanation Guide sheet in Excel workbook
-- Technical documentation in algorithm source code
-- Domain expert consultation for technical term validation
+For detailed workflow instructions, see the main workflow guide documentation.
 """
         
         with open(filepath, 'w') as f:
@@ -842,6 +1078,7 @@ For questions about the matching algorithm or explanations, refer to:
         }
         return hours_map.get(priority, 2.0)
     
+    # Main Workflow Method
     def run_enhanced_workflow_matching(self, requirements_file: str = "requirements.csv",
                                      activities_file: str = "activities.csv",
                                      gold_pairs_file: Optional[str] = None,
@@ -928,7 +1165,7 @@ For questions about the matching algorithm or explanations, refer to:
         for match in workflow_matches:
             priority_counts[match.review_priority] = priority_counts.get(match.review_priority, 0) + 1
             confidence_counts[match.confidence_level] = confidence_counts.get(match.confidence_level, 0) + 1
-            quality_counts[match.explanation.match_quality] = quality_counts.get(match.explanation.match_quality, 0) + 1
+            quality_counts[match.quality_grade] = quality_counts.get(match.quality_grade, 0) + 1
         
         print(f"\nMatch Distribution:")
         print(f"  Total Matches: {len(workflow_matches)}")
@@ -943,7 +1180,7 @@ For questions about the matching algorithm or explanations, refer to:
         for confidence, count in sorted(confidence_counts.items()):
             print(f"  {confidence:8}: {count:3d} matches ({count/len(workflow_matches)*100:5.1f}%)")
         
-        print(f"\nBy Match Quality:")
+        print(f"\nBy Requirement Quality:")
         for quality, count in sorted(quality_counts.items()):
             print(f"  {quality:10}: {count:3d} matches ({count/len(workflow_matches)*100:5.1f}%)")
         
@@ -955,11 +1192,14 @@ For questions about the matching algorithm or explanations, refer to:
         print(f"1. Open '{files_created['review_workbook']}' in Excel for detailed review")
         print(f"2. Review '{files_created['explanation_report']}' for visual summary")
         print(f"3. Assign engineers using '{files_created['action_items']}'")
-        print(f"4. Reference '{files_created['workflow_guide']}' for explanation guidance")
+        print(f"4. Address POOR/CRITICAL quality requirements first")
         
         # Estimate total effort
         total_hours = sum(self._estimate_review_hours(m.review_priority) for m in workflow_matches)
+        quality_improvement_candidates = len([m for m in workflow_matches if m.quality_grade in ['POOR', 'CRITICAL']])
+        
         print(f"\nEstimated Total Review Effort: {total_hours:.1f} hours")
+        print(f"Requirements needing quality improvement: {quality_improvement_candidates}")
         
         return matches_df
 
