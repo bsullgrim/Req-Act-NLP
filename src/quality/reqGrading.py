@@ -327,13 +327,17 @@ class RequirementAnalyzer:
             "top_issues": top_issues
         }
     
-    def create_excel_report(self, df: pd.DataFrame, output_file: str = None) -> str:
+    def create_excel_report(self, df: pd.DataFrame, output_file: str = None, repo_manager=None) -> str:
         """
         Create comprehensive Excel quality report from analysis results.
         """
         if output_file is None:
-            output_file = "outputs/quality_analysis/requirements_quality_report.xlsx"
-        
+            if repo_manager is None:
+                # Fallback to old path
+                output_file = "outputs/quality_analysis/requirements_quality_report.xlsx"
+            else:
+                output_file = str(repo_manager.structure['quality_analysis'] / "requirements_quality_report.xlsx")
+    
         # Ensure output directory exists
         output_path = Path(output_file)
         output_path.parent.mkdir(parents=True, exist_ok=True)

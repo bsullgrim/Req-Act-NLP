@@ -13,42 +13,53 @@ from .tables import TableGenerator
 from .templates import HTMLTemplateGenerator
 from .data import DataProcessor
 from .exports import DataExporter
+from src.utils.repository_setup import RepositoryStructureManager  
 
 class UnifiedEvaluationDashboard:
     """Unified dashboard that adapts based on available data."""
     
     def __init__(self, predictions_df: pd.DataFrame,
-                 ground_truth: Optional[Dict[str, List[Dict]]] = None,
-                 requirements_df: Optional[pd.DataFrame] = None,
-                 quality_results: Optional[Dict] = None,
-                 evaluation_results: Optional[Dict] = None,  # ← Add this
-                 output_dir: str = "evaluation_results"):
+                ground_truth: Optional[Dict[str, List[Dict]]] = None,
+                requirements_df: Optional[pd.DataFrame] = None,
+                quality_results: Optional[Dict] = None,
+                evaluation_results: Optional[Dict] = None,
+                output_dir: Optional[str] = None,  # Changed to Optional
+                repo_manager=None):
         
         self.predictions_df = predictions_df
         self.ground_truth = ground_truth
         self.requirements_df = requirements_df
         self.quality_results = quality_results
-        self.evaluation_results = evaluation_results or {}  # ← Store evaluation results
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
+        self.evaluation_results = evaluation_results or {}
+        
+        # Setup repository manager FIRST
+        if repo_manager is None:
+            raise ValueError("Repository manager is required")
+        self.repo_manager = repo_manager
+        
+        # THEN determine output directory
+        if output_dir is None:
+            self.output_dir = self.repo_manager.structure['evaluation_dashboards']
+        else:
+            self.output_dir = Path(output_dir)
+        
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         
         # Determine dashboard capabilities
         self.capabilities = {
             'validation_mode': bool(ground_truth or evaluation_results.get('aggregate_metrics')),
-            'exploration_mode': True,  # Always available
+            'exploration_mode': True,
             'quality_analysis': bool(quality_results or self._has_quality_columns()),
-            'coverage_analysis': True,  # Always available - we generate this from predictions
             'discovery_analysis': bool(evaluation_results.get('discovery_analysis')),
             'requirements_context': bool(requirements_df is not None)
         }
         
-        # Initialize components
+        # Initialize components AFTER repo_manager is set up
         self.data_processor = DataProcessor(ground_truth)
         self.chart_generator = ChartGenerator()
         self.table_generator = TableGenerator()
         self.template_generator = HTMLTemplateGenerator()
-        self.data_exporter = DataExporter(self.output_dir)
-
+        self.data_exporter = DataExporter(self.output_dir, self.repo_manager) 
     def _has_quality_columns(self) -> bool:
         """Check if predictions_df contains quality analysis columns."""
         quality_columns = ['Quality_Grade', 'Quality_Score', 'Clarity_Score', 

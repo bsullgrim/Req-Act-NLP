@@ -15,31 +15,29 @@ logger = logging.getLogger(__name__)
 class MatchingWorkbookGenerator:
     """Generate comprehensive Excel workbook for engineering teams to review matches."""
     
-    def __init__(self):
+    def __init__(self, repo_manager=None):
         self.workbook_path = None
+        if repo_manager is None:
+         raise ValueError("Repository manager is required")
+        self.repo_manager = repo_manager
         
     def create_workbook(self, 
-                       enhanced_df: pd.DataFrame,
-                       evaluation_results: Optional[Dict] = None,
-                       output_path: str = "outputs/engineering_review/matching_workbook.xlsx") -> str:
-        """
-        Create comprehensive matching workbook with multiple tabs.
+                    enhanced_df: pd.DataFrame,
+                    evaluation_results: Optional[Dict] = None,
+                    output_path: Optional[str] = None,
+                    repo_manager=None) -> str:
         
-        Args:
-            enhanced_df: Enhanced predictions with quality and scores
-            evaluation_results: Optional evaluation results with discovery analysis
-            output_path: Where to save the workbook
-            
-        Returns:
-            Path to created workbook
-        """
+        # Setup repository manager
+        if repo_manager is None:
+            from src.utils.repository_setup import RepositoryStructureManager
+            repo_manager = RepositoryStructureManager("outputs")
+            repo_manager.setup_repository_structure()
         
-        logger.info("📊 Creating comprehensive matching workbook...")
-        
-        # Ensure output directory exists
-        output_path = Path(output_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        
+        # Use proper output path
+        if output_path is None:
+            output_path = repo_manager.structure['engineering_review'] / "matching_workbook.xlsx"
+        else:
+            output_path = Path(output_path)
         # Create Excel writer
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
             

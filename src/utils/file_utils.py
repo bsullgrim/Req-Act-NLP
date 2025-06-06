@@ -13,6 +13,23 @@ logger = logging.getLogger(__name__)
 
 class SafeFileHandler:
     """Handle all file operations with encoding detection and error handling."""
+    def __init__(self, repo_manager=None):
+        if repo_manager is None:
+            from src.utils.repository_setup import RepositoryStructureManager
+            self.repo_manager = RepositoryStructureManager("outputs")
+        else:
+            self.repo_manager = repo_manager
+
+    def get_structured_path(self, file_type: str, filename: str) -> str:
+        """Get properly structured path for file type."""
+        if file_type == 'raw_data':
+            return str(self.repo_manager.structure['data_raw'] / filename)
+        elif file_type == 'matching_results':
+            return str(self.repo_manager.structure['matching_results'] / filename)
+        elif file_type == 'quality_analysis':
+            return str(self.repo_manager.structure['quality_analysis'] / filename)
+        else:
+            return filename  # Fallback to original
     
     def detect_encoding(self, file_path: str) -> str:
         """Detect the encoding of a file with fallback."""

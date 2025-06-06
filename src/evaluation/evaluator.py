@@ -30,16 +30,22 @@ logger = logging.getLogger(__name__)
 class EnhancedMatchingEvaluator:
     """Enhanced evaluator that adapts to ground truth availability and always includes quality analysis."""
     
-    def __init__(self, ground_truth_file: Optional[str] = None):
+    def __init__(self, ground_truth_file: Optional[str] = None, repo_manager=None):
         """
         Initialize evaluator with adaptive ground truth handling.
         
         Args:
             ground_truth_file: Path to manual traces CSV, or None if not available
+            repo_manager: Repository structure manager, or None to create one
         """
         self.ground_truth_file = ground_truth_file
         self.ground_truth = {}
         self.has_ground_truth = False
+        
+        # Setup repository manager
+        if repo_manager is None:
+            raise ValueError("Repository manager is required")
+        self.repo_manager = repo_manager
         
         # Initialize quality analyzer
         self.quality_analyzer = RequirementAnalyzer()
@@ -529,9 +535,9 @@ class EnhancedMatchingEvaluator:
                 predictions_df=enhanced_df,
                 ground_truth_file=self.ground_truth_file if self.has_ground_truth else None,
                 requirements_df=requirements_df,
-                evaluation_results=enhanced_evaluation_results,  # Use enhanced version
-                quality_results=None,  # Quality already integrated into enhanced_df
-                output_dir="outputs/evaluation_dashboard"
+                evaluation_results=enhanced_evaluation_results,
+                quality_results=None,
+                repo_manager=self.repo_manager  # Pass the repo manager if available
             )
             
             logger.info(f"✅ Dashboard created: {dashboard_path}")
@@ -569,7 +575,7 @@ class EnhancedMatchingEvaluator:
         
         # Step 3: Always create dashboard (adapts to available data)
         dashboard_path = self._create_dashboard(enhanced_df, evaluation_results, requirements_df)
-        self.quality_analyzer.create_excel_report(enhanced_df)
+        self.quality_analyzer.create_excel_report(enhanced_df, repo_manager=self.repo_manager)
         # Step 4: Print summary
         self._print_evaluation_summary(enhanced_df, evaluation_results)
         

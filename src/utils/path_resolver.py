@@ -12,7 +12,13 @@ logger = logging.getLogger(__name__)
 class SmartPathResolver:
     """Intelligently resolve file paths with auto-detection."""
     
-    def __init__(self):
+    def __init__(self, repo_manager=None):
+        if repo_manager is None:
+            from src.utils.repository_setup import RepositoryStructureManager
+            self.repo_manager = RepositoryStructureManager("outputs")
+        else:
+            self.repo_manager = repo_manager
+        
         # Common search locations in order of preference
         self.search_locations = [
             Path("."),              # Current directory

@@ -5,18 +5,16 @@ Simple, clean workflow that produces exactly 3 outputs:
 2. Quality Report (Excel) 
 3. Interactive Dashboard (HTML)
 """
-
 import pandas as pd
 import logging
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from datetime import datetime
 
 # Import core components
 from src.matching.matcher import FinalCleanMatcher
 from src.evaluation.evaluator import EnhancedMatchingEvaluator
-from matching_workbook_generator import create_matching_workbook
-
+from matching_workbook_generator import MatchingWorkbookGenerator
 
 # Import utils for file operations
 from src.utils.file_utils import SafeFileHandler
@@ -36,13 +34,13 @@ class CleanWorkflow:
                  activities_file: str = "activities.csv",
                  ground_truth_file: Optional[str] = "manual_matches.csv"):
         
-        # Initialize utilities
-        self.file_handler = SafeFileHandler()
-        self.path_resolver = SmartPathResolver()
+        # Create SINGLE repository manager for entire workflow
         self.repo_manager = RepositoryStructureManager("outputs")
+        self.repo_manager.setup_repository_structure()  # Only called once
         
-        # Setup basic repository structure
-        self.repo_manager.setup_repository_structure()
+        # Initialize utilities with repo_manager
+        self.file_handler = SafeFileHandler(repo_manager=self.repo_manager)
+        self.path_resolver = SmartPathResolver(repo_manager=self.repo_manager)
         
         # Resolve file paths
         file_mapping = {
@@ -59,8 +57,8 @@ class CleanWorkflow:
         # Verify critical files exist
         self._verify_files()
         
-        # Initialize components
-        self.matcher = FinalCleanMatcher()
+        # Initialize components with repo_manager (ONLY ONCE)
+        self.matcher = FinalCleanMatcher(repo_manager=self.repo_manager)
         
         logger.info("✓ Clean workflow initialized")
         logger.info(f"   Requirements: {self.requirements_file}")
@@ -114,14 +112,6 @@ class CleanWorkflow:
                     top_matches: int = 5) -> Dict[str, str]:
         """
         Run the complete workflow to generate 3 focused reports.
-        
-        Args:
-            matching_config: Optional matching weights configuration
-            min_similarity: Minimum similarity threshold
-            top_matches: Number of top matches per requirement
-            
-        Returns:
-            Dictionary with paths to the 3 generated reports
         """
         
         print("🚀 Clean Requirements Traceability Workflow")
@@ -175,10 +165,7 @@ class CleanWorkflow:
             logger.error(f"❌ Workflow failed: {e}")
             raise
 
-    
     def _run_matching(self, matching_config: Dict, min_similarity: float, top_matches: int) -> pd.DataFrame:
-        """Run the matching algorithm."""
-        
         try:
             matches_df = self.matcher.run_final_matching(
                 requirements_file=self.requirements_file,
@@ -187,9 +174,9 @@ class CleanWorkflow:
                 min_sim=min_similarity,
                 top_n=top_matches,
                 out_file="temp_matches",
-                save_explanations=False  # We don't need JSON explanations for our 3 reports
-            )
-            
+                save_explanations=False,
+                repo_manager=self.repo_manager  # Pass it down
+            )              
             logger.info(f"✓ Matching completed: {len(matches_df)} matches found")
             return matches_df
             
@@ -197,16 +184,16 @@ class CleanWorkflow:
             logger.error(f"❌ Matching failed: {e}")
             raise
 
-    def _run_evaluation(self, matches_df: pd.DataFrame) -> Dict:
-        """Run evaluation which creates the interactive dashboard."""
-        
+    def _run_evaluation(self, matches_df: pd.DataFrame) -> Dict[str, Any]:
+        """Run evaluation and create dashboard."""
         try:
             # Load requirements for context
             requirements_df = self.file_handler.safe_read_csv(self.requirements_file)
             
-            # Initialize evaluator (handles missing ground truth gracefully)
+            # Create evaluator with repository manager (ONLY ONCE)
             evaluator = EnhancedMatchingEvaluator(
-                ground_truth_file=self.ground_truth_file if Path(self.ground_truth_file).exists() else None
+                ground_truth_file=self.ground_truth_file if Path(self.ground_truth_file).exists() else None,
+                repo_manager=self.repo_manager  # Pass repo manager
             )
             
             # Run evaluation - this creates the interactive dashboard
@@ -227,12 +214,11 @@ class CleanWorkflow:
 
     def _generate_matching_workbook(self, enhanced_df: pd.DataFrame, evaluation_results: Optional[Dict]) -> str:
         """Generate comprehensive matching workbook."""
-        
         try:
-            workbook_path = create_matching_workbook(
+            workbook_generator = MatchingWorkbookGenerator(repo_manager=self.repo_manager)
+            workbook_path = workbook_generator.create_workbook(
                 enhanced_df=enhanced_df,
-                evaluation_results=evaluation_results,
-                output_path="outputs/engineering_review/matching_workbook.xlsx"
+                evaluation_results=evaluation_results
             )
             
             logger.info(f"✓ Matching workbook created: {workbook_path}")
@@ -289,7 +275,6 @@ class CleanWorkflow:
         
         print(f"\n✅ Workflow focused on business value - no redundant outputs!")
 
-
 def main():
     """Main entry point for clean workflow."""
     
@@ -336,7 +321,6 @@ def main():
         logger.error(f"💥 Workflow failed: {e}")
         print(f"\n❌ Critical error: {e}")
         print(f"🔧 Check logs for details")
-
 
 if __name__ == "__main__":
     main()

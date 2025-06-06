@@ -26,10 +26,18 @@ __all__ = [
 def create_unified_dashboard(predictions_df: pd.DataFrame,
                            ground_truth_file: Optional[str] = None,
                            requirements_df: Optional[pd.DataFrame] = None,
-                           evaluation_results: Optional[Dict] = None,  # ← Add this
+                           evaluation_results: Optional[Dict] = None,
                            quality_results: Optional[Dict] = None,
-                           output_dir: str = "evaluation_results") -> str:
-    """Create unified dashboard that adapts to available data."""
+                           output_dir: Optional[str] = None,
+                           repo_manager=None) -> str:
+    
+    # Setup repository structure
+    if repo_manager is None:
+        raise ValueError("Repository manager is required")
+    
+    # Use proper dashboard directory
+    if output_dir is None:
+        output_dir = str(repo_manager.structure['evaluation_dashboards'])
     
     # Load ground truth if provided (only if we don't already have evaluation results)
     ground_truth = None
@@ -57,8 +65,9 @@ def create_unified_dashboard(predictions_df: pd.DataFrame,
         ground_truth=ground_truth,
         requirements_df=requirements_df,
         quality_results=quality_results,
-        evaluation_results=evaluation_results,  # ← Pass evaluation results
-        output_dir=output_dir
+        evaluation_results=evaluation_results,
+        output_dir=output_dir,
+        repo_manager=repo_manager  # Pass it down
     )
     
     dashboard_path = dashboard.create_dashboard()

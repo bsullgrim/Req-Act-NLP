@@ -19,6 +19,7 @@ from dataclasses import dataclass
 # Import existing utils
 from src.utils.file_utils import SafeFileHandler
 from src.utils.path_resolver import SmartPathResolver
+from src.utils.repository_setup import RepositoryStructureManager
 
 @dataclass
 class MatchExplanation:
@@ -56,14 +57,19 @@ class FinalCleanMatcher:
     Evaluation against ground truth is handled separately by the evaluator module.
     """
     
-    def __init__(self, model_name: str = "en_core_web_trf"):
-        """Initialize with spaCy transformer model."""
+    def __init__(self, model_name: str = "en_core_web_trf", repo_manager=None):
+        """Initialize with spaCy transformer model and repository manager."""
         try:
             self.nlp = spacy.load(model_name)
             logger.info(f"Loaded spaCy model: {model_name}")
         except OSError:
             logger.error(f"Could not load model {model_name}")
             raise
+        
+        # Store repository manager (don't create or setup)
+        if repo_manager is None:
+            raise ValueError("Repository manager is required")
+        self.repo_manager = repo_manager
         
         # Debug counters (reset for each run)
         self.debug_bm25_count = 0
@@ -491,7 +497,8 @@ class FinalCleanMatcher:
                           min_sim: float = 0.35,
                           top_n: int = 5,
                           out_file: str = "final_clean_matches",
-                          save_explanations: bool = True) -> pd.DataFrame:
+                          save_explanations: bool = True,
+                          repo_manager=None)  -> pd.DataFrame:
         """
         Run final matching with complete explainability.
         
@@ -507,6 +514,8 @@ class FinalCleanMatcher:
         Returns:
             DataFrame with matches and scores
         """
+        if repo_manager is not None:
+            self.repo_manager = repo_manager
         # Default semantic-focused configuration weights
         if weights is None:
             weights = {
@@ -651,16 +660,14 @@ class FinalCleanMatcher:
         
         if not matches_df.empty:
             # Save matches to CSV
-            csv_file = f"results/{out_file}.csv"
-            output_path = Path(csv_file)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
+            csv_file = self.repo_manager.structure['matching_results'] / f"{out_file}.csv"
+            csv_file.parent.mkdir(parents=True, exist_ok=True)            
             matches_df.to_csv(csv_file, index=False, encoding='utf-8')
             logger.info(f"Saved {len(matches)} matches to {csv_file}")
             
             # Save explanations to JSON if requested
             if save_explanations and match_explanations:
-                explanations_file = f"results/{out_file}_explanations.json"
+                explanations_file = self.repo_manager.structure['matching_results'] / f"{out_file}_explanations.json"
                 explanations_data = []
                 for exp in match_explanations:
                     explanations_data.append({
