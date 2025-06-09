@@ -1,5 +1,6 @@
 """
 HTML Templates - Main HTML structure and styling
+FIXED VERSION: JavaScript syntax errors corrected
 """
 
 from datetime import datetime
@@ -842,7 +843,7 @@ class HTMLTemplateGenerator:
                 margin: 2% auto;
                 padding: 1rem;
             }
-        }
+        
         .coverage-analysis-container, .quality-analysis-container {
             background: white;
             border-radius: 8px;
@@ -924,10 +925,581 @@ class HTMLTemplateGenerator:
             flex: 1;
             font-weight: 500;
         }
+                .modal-header {
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #2c3e50;
+            font-size: 1.5rem;
+        }
+
+        .modal-section {
+            margin-bottom: 2rem;
+        }
+
+        .modal-section h4 {
+            color: #495057;
+            margin-bottom: 1rem;
+            font-size: 1.2rem;
+            border-left: 4px solid #007bff;
+            padding-left: 1rem;
+        }
+
+        .modal-field {
+            margin-bottom: 0.75rem;
+        }
+
+        .req-text-box, .activity-text-box {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.5;
+            color: #495057;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .score-breakdown {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .score-item {
+            margin-bottom: 1rem;
+        }
+
+        .score-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .score-bar {
+            position: relative;
+            background: #e9ecef;
+            border-radius: 20px;
+            height: 30px;
+            overflow: hidden;
+        }
+
+        .score-fill {
+            background: linear-gradient(90deg, #28a745 0%, #20c997 50%, #17a2b8 100%);
+            height: 100%;
+            border-radius: 20px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .score-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 0.9rem;
+            z-index: 1;
+        }
+
+        .confidence-indicator {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .confidence-badge {
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .confidence-badge.high-conf {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .confidence-badge.medium-conf {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .confidence-badge.low-conf {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .match-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .overall-score {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .score-description {
+            display: block;
+            font-size: 0.85rem;
+            color: #666;
+            font-weight: normal;
+            margin-top: 0.25rem;
+        }
+
+        .contribution {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+            font-style: italic;
+        }
+
+        .semantic-fill {
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+        }
+
+        .bm25-fill {
+            background: linear-gradient(90deg, #007bff 0%, #17a2b8 100%);
+        }
+
+        .other-fill {
+            background: linear-gradient(90deg, #6f42c1 0%, #e83e8c 100%);
+        }
+
+        .insights-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .insight-item {
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+
+        .manual-matches-box {
+            background: #e7f3ff;
+            border: 1px solid #b3d7ff;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .manual-match-item {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #d1ecf1;
+            color: #0c5460;
+        }
+
+        .manual-match-item:last-child {
+            border-bottom: none;
+        }
+
+        .score-highlight {
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: #fff3cd;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #856404;
+        }
+
+        @media (max-width: 768px) {
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .match-summary {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+        .shared-terms-container {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .shared-terms-list {
+            margin-bottom: 0.75rem;
+        }
+
+        .shared-term-badge {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #1565c0;
+            padding: 0.25rem 0.5rem;
+            margin: 0.125rem;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .evidence-summary {
+            font-size: 0.9rem;
+            color: #495057;
+            font-style: italic;
+        }
+
+        /* Match Explanation */
+        .match-explanation {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+
+        .explanation-item {
+            margin-bottom: 1rem;
+        }
+
+        .explanation-item ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .explanation-item li {
+            margin: 0.25rem 0;
+            line-height: 1.4;
+            font-size: 0.9rem;
+        }
+
+        .matcher-summary {
+            background: #e7f3ff;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+        }
+
+        .matcher-summary p {
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
+        }
+
+        .recommendation-box {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            border-radius: 4px;
+        }
+
+        /* Discovery Modal Styles */
+        .discovery-header-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .discovery-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .discovery-badge.high-disc {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .discovery-badge.medium-disc {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .discovery-badge.low-disc {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .discovery-score {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .discovery-score-details {
+            margin-top: 1rem;
+        }
+
+        .discovery-explanation {
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: #e7f3ff;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        /* Manual Analysis Containers */
+        .manual-analysis-container {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+
+        .manual-count-display {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .manual-score-display {
+            margin-bottom: 1rem;
+            padding: 0.5rem;
+            background: white;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .manual-match-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .manual-match-item:last-child {
+            border-bottom: none;
+        }
+
+        .match-number {
+            color: #007bff;
+            font-weight: bold;
+            margin-right: 0.5rem;
+            min-width: 20px;
+        }
+
+        .match-text {
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        /* Analysis Comparison */
+        .analysis-comparison {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #fff;
+            border-radius: 4px;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .comparison-insight {
+            margin-bottom: 0.75rem;
+            color: #495057;
+        }
+
+        .discovery-value {
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        /* Gap Analysis Styles */
+        .gap-header-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+
+        .gap-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 15px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .gap-badge.large-gap {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .gap-badge.medium-gap {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .gap-badge.small-gap {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .gap-score {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .algorithm-score-details {
+            margin-top: 1rem;
+        }
+
+        .gap-explanation {
+            margin-top: 0.5rem;
+            padding: 0.75rem;
+            background: #fff3cd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .gap-comparison {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #fff;
+            border-radius: 4px;
+            border-left: 4px solid #dc3545;
+        }
+
+        .gap-significance {
+            margin-top: 0.75rem;
+            font-size: 0.9rem;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        /* Error and Warning States */
+        .no-manual-matches {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .no-manual-matches ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+
+        .no-manual-data {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 4px;
+            padding: 1rem;
+            color: #721c24;
+        }
+
+        /* Insights Grid */
+        .insights-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .insight-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 4px solid #007bff;
+        }
+
+        .insight-item.full-width {
+            grid-column: 1 / -1;
+            border-left-color: #28a745;
+        }
+
+        .metric-label {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value.confidence-high {
+            color: #28a745;
+        }
+
+        .metric-value.confidence-medium {
+            color: #ffc107;
+        }
+
+        .metric-value.confidence-low {
+            color: #dc3545;
+        }
+
+        .metric-value.gap-large {
+            color: #dc3545;
+        }
+
+        .metric-value.gap-medium {
+            color: #ffc107;
+        }
+
+        .metric-value.gap-small {
+            color: #28a745;
+        }
+
+        .metric-description {
+            font-size: 0.85rem;
+            color: #6c757d;
+            line-height: 1.3;
+        }
+
+        .recommendation-content {
+            background: #e8f5e8;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-top: 0.5rem;
+            line-height: 1.4;
+        }
+
+        .score-description {
+            display: block;
+            font-size: 0.8rem;
+            color: #666;
+            font-weight: normal;
+            margin-top: 0.25rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .discovery-header-summary, .gap-header-summary {
+                flex-direction: column;
+                gap: 0.5rem;
+                text-align: center;
+            }
+        }
         """
     
     def _get_javascript(self) -> str:
-        """Return JavaScript for dashboard interactivity."""
+        """Return JavaScript for dashboard interactivity - FIXED VERSION with integrated modals."""
         return """
         // Global variables for sorting
         let predictionsSort = { column: -1, ascending: true };
@@ -945,41 +1517,34 @@ class HTMLTemplateGenerator:
             });
             
             // Show selected section
-            document.getElementById(sectionName + '-section').classList.add('active');
+            const selectedSection = document.getElementById(sectionName + '-section');
+            if (selectedSection) {
+                selectedSection.classList.add('active');
+            }
             
             // Activate corresponding nav button
-            event.target.classList.add('active');
+            if (event && event.target) {
+                event.target.classList.add('active');
+            }
         }
 
-        // Table filtering
-        function filterPredictionsTable() {
+        // SIMPLIFIED search functions - NO FILTERING
+        function searchPredictionsTable() {
             const searchTerm = document.getElementById('predictions-search').value.toLowerCase();
-            const scoreFilter = document.getElementById('score-filter').value;
             const rows = document.querySelectorAll('#predictions-table .data-row');
             let visibleCount = 0;
 
             rows.forEach(row => {
                 const reqId = row.querySelector('.req-id').textContent.toLowerCase();
-                const reqName = row.getAttribute('data-req-name-full').toLowerCase();
-                const activityName = row.getAttribute('data-activity-full').toLowerCase();
-                const score = parseFloat(row.getAttribute('data-combined-score'));
+                const reqName = row.querySelector('.req-name').textContent.toLowerCase();
+                const activityName = row.querySelector('.activity-name').textContent.toLowerCase();
 
-                // Search filter
-                const searchMatch = reqId.includes(searchTerm) || 
-                                  reqName.includes(searchTerm) || 
-                                  activityName.includes(searchTerm);
+                const searchMatch = !searchTerm || 
+                                reqId.includes(searchTerm) || 
+                                reqName.includes(searchTerm) || 
+                                activityName.includes(searchTerm);
 
-                // Score filter
-                let scoreMatch = true;
-                if (scoreFilter === 'high') {
-                    scoreMatch = score >= 1.0;
-                } else if (scoreFilter === 'medium') {
-                    scoreMatch = score >= 0.6 && score < 1.0;
-                } else if (scoreFilter === 'low') {
-                    scoreMatch = score < 0.6;
-                }
-
-                if (searchMatch && scoreMatch) {
+                if (searchMatch) {
                     row.style.display = '';
                     visibleCount++;
                 } else {
@@ -990,13 +1555,74 @@ class HTMLTemplateGenerator:
             document.getElementById('predictions-count').textContent = `Showing ${visibleCount} results`;
         }
 
-        // Table sorting
+        function searchDiscoveryTable() {
+            const searchTerm = document.getElementById('discovery-search').value.toLowerCase();
+            const rows = document.querySelectorAll('#discovery-table .data-row');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const reqId = row.querySelector('.req-id').textContent.toLowerCase();
+                const activityName = row.querySelector('.activity-name').textContent.toLowerCase();
+
+                const searchMatch = !searchTerm || 
+                                reqId.includes(searchTerm) || 
+                                activityName.includes(searchTerm);
+
+                if (searchMatch) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            document.getElementById('discovery-count').textContent = `Showing ${visibleCount} results`;
+        }
+
+        function searchGapsTable() {
+            const searchTerm = document.getElementById('gaps-search').value.toLowerCase();
+            const rows = document.querySelectorAll('#gaps-table .data-row');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const reqId = row.querySelector('.req-id').textContent.toLowerCase();
+                const activityName = row.querySelector('.activity-name').textContent.toLowerCase();
+
+                const searchMatch = !searchTerm || 
+                                reqId.includes(searchTerm) || 
+                                activityName.includes(searchTerm);
+
+                if (searchMatch) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            document.getElementById('gaps-count').textContent = `Showing ${visibleCount} results`;
+        }
+
+        // Simple show all function
+        function showAllRows() {
+            const rows = document.querySelectorAll('#predictions-table .data-row');
+            rows.forEach(row => {
+                row.style.display = '';
+            });
+            document.getElementById('predictions-count').textContent = `Showing ${rows.length} results`;
+            document.getElementById('predictions-search').value = '';
+        }
+
+        // Table sorting functions
         function sortPredictionsTable(columnIndex) {
             const table = document.getElementById('predictions-table');
+            if (!table) return;
+            
             const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            
             const rows = Array.from(tbody.querySelectorAll('.data-row'));
 
-            // Update sort direction
             if (predictionsSort.column === columnIndex) {
                 predictionsSort.ascending = !predictionsSort.ascending;
             } else {
@@ -1004,14 +1630,14 @@ class HTMLTemplateGenerator:
                 predictionsSort.ascending = true;
             }
 
-            // Update sort arrows
             document.querySelectorAll('#predictions-table .sort-arrow').forEach(arrow => {
                 arrow.textContent = '↕';
             });
             const currentArrow = document.querySelectorAll('#predictions-table .sort-arrow')[columnIndex];
-            currentArrow.textContent = predictionsSort.ascending ? '↑' : '↓';
+            if (currentArrow) {
+                currentArrow.textContent = predictionsSort.ascending ? '↑' : '↓';
+            }
 
-            // Sort rows
             rows.sort((a, b) => {
                 let aVal, bVal;
 
@@ -1021,12 +1647,12 @@ class HTMLTemplateGenerator:
                         bVal = b.querySelector('.req-id').textContent;
                         break;
                     case 1: // Req Name
-                        aVal = a.getAttribute('data-req-name-full');
-                        bVal = b.getAttribute('data-req-name-full');
+                        aVal = a.querySelector('.req-name').textContent;
+                        bVal = b.querySelector('.req-name').textContent;
                         break;
                     case 2: // Activity Name
-                        aVal = a.getAttribute('data-activity-full');
-                        bVal = b.getAttribute('data-activity-full');
+                        aVal = a.querySelector('.activity-name').textContent;
+                        bVal = b.querySelector('.activity-name').textContent;
                         break;
                     default: // Score columns
                         const scoreCells = a.querySelectorAll('.score-cell');
@@ -1043,66 +1669,113 @@ class HTMLTemplateGenerator:
                 }
             });
 
-            // Reappend sorted rows
             rows.forEach(row => tbody.appendChild(row));
         }
 
-        // Modal functionality
-        function showRowDetails(row, tableType) {
-            const modal = document.getElementById('row-detail-modal');
-            const modalBody = document.getElementById('modal-body');
+        function sortDiscoveryTable(columnIndex) {
+            const table = document.getElementById('discovery-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            
+            const rows = Array.from(tbody.querySelectorAll('.data-row'));
 
-            const reqId = row.getAttribute('data-req-id');
-            const reqName = row.getAttribute('data-req-name-full');
-            const activityName = row.getAttribute('data-activity-full');
-
-            let modalContent = `
-                <div class="modal-header">
-                    <h3>Details: ${reqId}</h3>
-                </div>
-                
-                <div class="modal-section">
-                    <h4>📋 Requirement Name</h4>
-                    <div class="modal-text">${reqName}</div>
-                </div>
-                
-                <div class="modal-section">
-                    <h4>🎯 Matched Activity</h4>
-                    <div class="modal-text">${activityName}</div>
-                </div>
-            `;
-
-            if (tableType === 'predictions') {
-                const combinedScore = row.getAttribute('data-combined-score');
-                const scoreCells = row.querySelectorAll('.score-cell');
-                
-                modalContent += `
-                    <div class="modal-section">
-                        <h4>📊 Score Breakdown</h4>
-                        <div class="modal-scores">
-                            <div class="score-card">
-                                <div class="score-value">${parseFloat(combinedScore).toFixed(3)}</div>
-                                <div class="score-label">Combined Score</div>
-                            </div>
-                            <div class="score-card">
-                                <div class="score-value">${parseFloat(scoreCells[1].textContent).toFixed(3)}</div>
-                                <div class="score-label">Semantic</div>
-                            </div>
-                            <div class="score-card">
-                                <div class="score-value">${parseFloat(scoreCells[2].textContent).toFixed(3)}</div>
-                                <div class="score-label">BM25</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
+            document.querySelectorAll('#discovery-table .sort-arrow').forEach(arrow => {
+                arrow.textContent = '↕';
+            });
+            const currentArrow = document.querySelectorAll('#discovery-table .sort-arrow')[columnIndex];
+            const ascending = currentArrow && currentArrow.textContent !== '↑';
+            if (currentArrow) {
+                currentArrow.textContent = ascending ? '↑' : '↓';
             }
 
-            modalBody.innerHTML = modalContent;
-            modal.style.display = 'block';
+            rows.sort((a, b) => {
+                let aVal, bVal;
+
+                switch(columnIndex) {
+                    case 0: // Req ID
+                        aVal = a.querySelector('.req-id').textContent;
+                        bVal = b.querySelector('.req-id').textContent;
+                        break;
+                    case 1: // Activity Name
+                        aVal = a.querySelector('.activity-name').textContent;
+                        bVal = b.querySelector('.activity-name').textContent;
+                        break;
+                    case 2: // Discovery Score
+                        aVal = parseFloat(a.getAttribute('data-score'));
+                        bVal = parseFloat(b.getAttribute('data-score'));
+                        break;
+                    case 3: // Manual Matches
+                        aVal = parseInt(a.querySelector('.manual-count').textContent);
+                        bVal = parseInt(b.querySelector('.manual-count').textContent);
+                        break;
+                }
+
+                if (typeof aVal === 'string') {
+                    return ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                } else {
+                    return ascending ? aVal - bVal : bVal - aVal;
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
         }
 
-        function closeModal() {
-            document.getElementById('row-detail-modal').style.display = 'none';
+        function sortGapsTable(columnIndex) {
+            const table = document.getElementById('gaps-table');
+            if (!table) return;
+            
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+            
+            const rows = Array.from(tbody.querySelectorAll('.data-row'));
+
+            document.querySelectorAll('#gaps-table .sort-arrow').forEach(arrow => {
+                arrow.textContent = '↕';
+            });
+            const currentArrow = document.querySelectorAll('#gaps-table .sort-arrow')[columnIndex];
+            const ascending = currentArrow && currentArrow.textContent !== '↑';
+            if (currentArrow) {
+                currentArrow.textContent = ascending ? '↑' : '↓';
+            }
+
+            rows.sort((a, b) => {
+                let aVal, bVal;
+
+                switch(columnIndex) {
+                    case 0: // Req ID
+                        aVal = a.querySelector('.req-id').textContent;
+                        bVal = b.querySelector('.req-id').textContent;
+                        break;
+                    case 1: // Activity Name
+                        aVal = a.querySelector('.activity-name').textContent;
+                        bVal = b.querySelector('.activity-name').textContent;
+                        break;
+                    case 2: // Algorithm Score
+                        const scoreCells = a.querySelectorAll('.score-cell');
+                        aVal = parseFloat(scoreCells[0].textContent);
+                        bVal = parseFloat(b.querySelectorAll('.score-cell')[0].textContent);
+                        break;
+                    case 3: // Manual Score
+                        const scoreCell1 = a.querySelectorAll('.score-cell');
+                        aVal = parseFloat(scoreCell1[1].textContent);
+                        bVal = parseFloat(b.querySelectorAll('.score-cell')[1].textContent);
+                        break;
+                    case 4: // Gap
+                        aVal = parseFloat(a.getAttribute('data-gap'));
+                        bVal = parseFloat(b.getAttribute('data-gap'));
+                        break;
+                }
+
+                if (typeof aVal === 'string') {
+                    return ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                } else {
+                    return ascending ? aVal - bVal : bVal - aVal;
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
         }
 
         // Export functions
@@ -1114,8 +1787,8 @@ class HTMLTemplateGenerator:
             
             visibleRows.forEach(row => {
                 const reqId = row.getAttribute('data-req-id');
-                const reqName = row.getAttribute('data-req-name-full');
-                const activityName = row.getAttribute('data-activity-full');
+                const reqName = JSON.parse(row.getAttribute('data-req-name-full') || '"N/A"');
+                const activityName = JSON.parse(row.getAttribute('data-activity-full') || '"N/A"');
                 const combinedScore = row.getAttribute('data-combined-score');
                 const scoreCells = row.querySelectorAll('.score-cell');
                 
@@ -1124,14 +1797,65 @@ class HTMLTemplateGenerator:
                     `"${reqName.replace(/"/g, '""')}"`,
                     `"${activityName.replace(/"/g, '""')}"`,
                     combinedScore,
-                    scoreCells[1].textContent,
-                    scoreCells[2].textContent
+                    scoreCells[1] ? scoreCells[1].textContent : '',
+                    scoreCells[2] ? scoreCells[2].textContent : ''
                 ];
                 
                 csv += rowData.join(',') + '\\n';
             });
             
             downloadCSV(csv, 'predictions_export.csv');
+        }
+        
+        function exportDiscoveryTable() {
+            const rows = document.querySelectorAll('#discovery-table .data-row');
+            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+            
+            let csv = 'Requirement ID,Activity Name,Discovery Score,Manual Matches Count\\n';
+            
+            visibleRows.forEach(row => {
+                const reqId = row.getAttribute('data-req-id');
+                const activityName = JSON.parse(row.getAttribute('data-activity-full') || '"N/A"');
+                const score = row.getAttribute('data-score');
+                const manualCount = row.querySelector('.manual-count').textContent;
+                
+                const rowData = [
+                    reqId,
+                    `"${activityName.replace(/"/g, '""')}"`,
+                    score,
+                    manualCount
+                ];
+                
+                csv += rowData.join(',') + '\\n';
+            });
+            
+            downloadCSV(csv, 'discovery_export.csv');
+        }
+
+        function exportGapsTable() {
+            const rows = document.querySelectorAll('#gaps-table .data-row');
+            const visibleRows = Array.from(rows).filter(row => row.style.display !== 'none');
+            
+            let csv = 'Requirement ID,Best Algorithm Activity,Algorithm Score,Manual Score,Gap\\n';
+            
+            visibleRows.forEach(row => {
+                const reqId = row.getAttribute('data-req-id');
+                const activityName = JSON.parse(row.getAttribute('data-activity-full') || '"N/A"');
+                const gap = row.getAttribute('data-gap');
+                const scoreCells = row.querySelectorAll('.score-cell');
+                
+                const rowData = [
+                    reqId,
+                    `"${activityName.replace(/"/g, '""')}"`,
+                    scoreCells[0] ? scoreCells[0].textContent : '',
+                    scoreCells[1] ? scoreCells[1].textContent : '',
+                    gap
+                ];
+                
+                csv += rowData.join(',') + '\\n';
+            });
+            
+            downloadCSV(csv, 'score_gaps_export.csv');
         }
 
         function downloadCSV(csv, filename) {
@@ -1146,27 +1870,480 @@ class HTMLTemplateGenerator:
             window.URL.revokeObjectURL(url);
         }
 
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            // Close modal when clicking outside
-            window.addEventListener('click', function(event) {
-                const modal = document.getElementById('row-detail-modal');
-                if (event.target === modal) {
-                    closeModal();
+        // =================================================================
+        // COMPLETE MODAL SYSTEM - INTEGRATED (NO calculations, pure display)
+        // =================================================================
+        
+        // Helper function to get requirement text from multiple sources
+        function getRequirementText(reqId) {
+            const predictionsRows = document.querySelectorAll('#predictions-table .data-row');
+            for (let row of predictionsRows) {
+                if (row.getAttribute('data-req-id') === reqId) {
+                    const reqText = row.getAttribute('data-req-text');
+                    if (reqText && reqText !== 'Requirement text not available' && !reqText.includes('not available')) {
+                        return reqText;
+                    }
                 }
-            });
+            }
+            return `Detailed requirement text for ${reqId} is not available in the current dataset.`;
+        }
 
-            // Initialize table counts
-            if (document.getElementById('predictions-count')) {
-                const predictionsRows = document.querySelectorAll('#predictions-table .data-row').length;
-                document.getElementById('predictions-count').textContent = `Showing ${predictionsRows} results`;
+        // PREDICTIONS MODAL GENERATOR
+        function createPredictionsModal(row, reqId) {
+            const reqName = row.getAttribute('data-req-name-full') || 'N/A';
+            const activityName = row.getAttribute('data-activity-full') || 'N/A';
+            const combinedScore = parseFloat(row.getAttribute('data-combined-score')) || 0;
+            const reqText = row.getAttribute('data-req-text') || 'Requirement text not available';
+            
+            // Get all available score components from table cells
+            const scoreCells = row.querySelectorAll('.score-cell');
+            const semanticScore = scoreCells[1] ? parseFloat(scoreCells[1].textContent) : null;
+            const bm25Score = scoreCells[2] ? parseFloat(scoreCells[2].textContent) : null;
+            const syntacticScore = scoreCells[3] ? parseFloat(scoreCells[3].textContent) : null;
+            const domainScore = scoreCells[4] ? parseFloat(scoreCells[4].textContent) : null;
+            const queryExpansionScore = scoreCells[5] ? parseFloat(scoreCells[5].textContent) : null;
+            
+            // Get explainability data from all available attributes
+            const sharedTerms = row.getAttribute('data-shared-terms') || '';
+            const semanticLevel = row.getAttribute('data-semantic-level') || row.getAttribute('data-match-quality') || 'Not Available';
+            const matchQuality = row.getAttribute('data-match-quality') || 'Pending Analysis';
+            const semanticExplanation = row.getAttribute('data-semantic-explanation') || 'Semantic analysis not available';
+            const bm25Explanation = row.getAttribute('data-bm25-explanation') || 'BM25 analysis not available';
+            const syntacticExplanation = row.getAttribute('data-syntactic-explanation') || 'Syntactic analysis not available';
+            const domainExplanation = row.getAttribute('data-domain-explanation') || 'Domain analysis not available';
+            const queryExpansionExplanation = row.getAttribute('data-query-expansion-explanation') || 'Query expansion analysis not available';
+            
+            // Parse shared terms
+            let sharedTermsList = [];
+            if (sharedTerms) {
+                try {
+                    sharedTermsList = JSON.parse(sharedTerms);
+                } catch (e) {
+                    sharedTermsList = sharedTerms.split(',').map(term => term.trim()).filter(term => term);
+                }
             }
 
-            // Keyboard shortcuts
+            // Get enhanced requirement text
+            let enhancedReqText = reqText;
+            if (reqText === 'Requirement text not available' || reqText.includes('not available')) {
+                enhancedReqText = getRequirementText(reqId);
+            }
+
+            return `
+                <div class="modal-header">
+                    <h3>Match Analysis: ${reqId}</h3>
+                    <div class="modal-field"><strong>Requirement:</strong> ${reqName}</div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Requirement Specification</h4>
+                    <div class="req-text-box">${enhancedReqText}</div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Matched Activity</h4>
+                    <div class="activity-text-box">${activityName}</div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Score Analysis</h4>
+                    <div class="score-breakdown">
+                        <div class="score-item">
+                            <div class="score-label">
+                                <strong>Combined Score:</strong> ${combinedScore.toFixed(3)}
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill" style="width: ${Math.min(combinedScore * 100, 100)}%"></div>
+                            </div>
+                            <div class="score-description">Final weighted score from all components</div>
+                        </div>
+                        
+                        ${semanticScore !== null ? `
+                        <div class="score-item">
+                            <div class="score-label">
+                                <strong>Semantic Score:</strong> ${semanticScore.toFixed(3)}
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill semantic-fill" style="width: ${Math.min(semanticScore * 100, 100)}%"></div>
+                            </div>
+                            <div class="score-description">${semanticExplanation}</div>
+                        </div>
+                        ` : ''}
+                        
+                        ${bm25Score !== null ? `
+                        <div class="score-item">
+                            <div class="score-label">
+                                <strong>BM25 Score:</strong> ${bm25Score.toFixed(3)}
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill bm25-fill" style="width: ${Math.min(bm25Score * 20, 100)}%"></div>
+                            </div>
+                            <div class="score-description">${bm25Explanation}</div>
+                        </div>
+                        ` : ''}
+                        
+                        ${syntacticScore !== null ? `
+                        <div class="score-item">
+                            <div class="score-label">
+                                <strong>Syntactic Score:</strong> ${syntacticScore.toFixed(3)}
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill other-fill" style="width: ${Math.min(syntacticScore * 100, 100)}%"></div>
+                            </div>
+                            <div class="score-description">${syntacticExplanation}</div>
+                        </div>
+                        ` : ''}
+                        
+                        ${domainScore !== null ? `
+                        <div class="score-item">
+                            <div class="score-label">
+                                <strong>Domain Score:</strong> ${domainScore.toFixed(3)}
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill other-fill" style="width: ${Math.min(domainScore * 100, 100)}%"></div>
+                            </div>
+                            <div class="score-description">${domainExplanation}</div>
+                        </div>
+                        ` : ''}
+                        
+                        ${queryExpansionScore !== null ? `
+                        <div class="score-item">
+                            <div class="score-label">
+                                <strong>Query Expansion Score:</strong> ${queryExpansionScore.toFixed(3)}
+                            </div>
+                            <div class="score-bar">
+                                <div class="score-fill other-fill" style="width: ${Math.min(queryExpansionScore * 100, 100)}%"></div>
+                            </div>
+                            <div class="score-description">${queryExpansionExplanation}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                ${sharedTermsList.length > 0 ? `
+                <div class="modal-section">
+                    <h4>Shared Terms Analysis</h4>
+                    <div class="shared-terms-container">
+                        <div class="shared-terms-list">
+                            <strong>Identified Terms:</strong> ${sharedTermsList.join(', ')}
+                        </div>
+                        <div class="evidence-summary">
+                            Found ${sharedTermsList.length} common terms indicating textual overlap
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+                
+                <div class="modal-section">
+                    <h4>Match Assessment</h4>
+                    <table class="assessment-table">
+                        <tr>
+                            <td><strong>Match Quality:</strong></td>
+                            <td>${matchQuality}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Semantic Level:</strong></td>
+                            <td>${semanticLevel}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Confidence Level:</strong></td>
+                            <td>${combinedScore >= 0.8 ? 'High' : combinedScore >= 0.5 ? 'Medium' : 'Low'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Recommendation:</strong></td>
+                            <td>${combinedScore >= 0.8 ? 'Accept for use' : combinedScore >= 0.5 ? 'Review before use' : 'Requires validation'}</td>
+                        </tr>
+                    </table>
+                </div>
+            `;
+        }
+
+        // DISCOVERY MODAL GENERATOR - FIXED VERSION
+        function createDiscoveryModal(row, reqId) {
+            const reqName = row.getAttribute('data-req-name-full') || 'N/A';
+            const activityName = row.getAttribute('data-activity-full') || 'N/A';
+            const reqText = row.getAttribute('data-req-text') || 'Requirement text not available';
+            const score = parseFloat(row.getAttribute('data-score')) || 0;
+            const manualCountElement = row.querySelector('.manual-count');
+            const manualCount = manualCountElement ? parseInt(manualCountElement.textContent) || 0 : 0;
+            
+            // Parse manual data - FIXED VERSION
+            let manualMatches = [];
+            let manualActivityNames = []; // Will be set from manualMatches
+            try {
+                const manualMatchesData = row.getAttribute('data-manual-matches');
+                
+                if (manualMatchesData && manualMatchesData !== 'null' && manualMatchesData !== '[]') {
+                    manualMatches = JSON.parse(manualMatchesData);
+                    manualActivityNames = manualMatches; // FIX: Use the actual data we have
+                }
+            } catch (e) {
+                console.error('Could not parse manual data for discovery:', e);
+            }
+            
+            // Get enhanced requirement text
+            let enhancedReqText = reqText;
+            if (reqText === 'Requirement text not available' || reqText.includes('not available')) {
+                enhancedReqText = getRequirementText(reqId);
+            }
+
+            return `
+                <div class="modal-header">
+                    <h3>Discovery Analysis: ${reqId}</h3>
+                    <div class="modal-field"><strong>Requirement:</strong> ${reqName}</div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Requirement Specification</h4>
+                    <div class="req-text-box">${enhancedReqText}</div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Algorithm Discovery</h4>
+                    <div class="activity-text-box">
+                        <strong>Discovered Activity:</strong> ${activityName}
+                    </div>
+                    <div class="discovery-details">
+                        <p><strong>Discovery Score:</strong> ${score.toFixed(3)}</p>
+                        <p><strong>Priority Level:</strong> ${score > 1.0 ? 'High' : score > 0.7 ? 'Medium' : 'Low'}</p>
+                        <p><strong>Status:</strong> Algorithm found this connection but it was not in manual analysis</p>
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Manual Analysis Comparison</h4>
+                    <table class="comparison-table">
+                        <tr>
+                            <td><strong>Manual Matches Found:</strong></td>
+                            <td>${manualCount} activities</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Algorithm Discovery:</strong></td>
+                            <td>1 additional activity</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Discovery Type:</strong></td>
+                            <td>${manualCount === 0 ? 'New connection (no manual matches)' : 'Additional match (supplements manual analysis)'}</td>
+                        </tr>
+                    </table>
+                    
+                    ${manualActivityNames && manualActivityNames.length > 0 ? `
+                        <div class="manual-activities-section">
+                            <h5>Manual Activities Identified:</h5>
+                            <ul class="manual-activities-list">
+                                ${manualActivityNames.map(activity => `<li>${activity}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : manualCount > 0 ? `
+                        <div class="manual-activities-section">
+                            <p><strong>Note:</strong> Manual analysis found ${manualCount} activities, but detailed activity names are not available in current dataset.</p>
+                        </div>
+                    ` : `
+                        <div class="manual-activities-section">
+                            <p><strong>Pure Discovery:</strong> No manual matches were found, making this a completely new connection.</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Recommendation</h4>
+                    <div class="recommendation-content">
+                        <p><strong>Action Required:</strong> ${score > 1.0 ? 'High priority review recommended' : score > 0.7 ? 'Include in next review cycle' : 'Lower priority, review when resources allow'}</p>
+                        <p><strong>Review Focus:</strong> Validate whether this algorithmic discovery represents a genuine traceability connection.</p>
+                        ${manualCount > 0 ? '<p><strong>Context:</strong> Consider this discovery alongside the existing manual matches for complete coverage.</p>' : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // GAPS MODAL GENERATOR - FIXED VERSION  
+        function createGapsModal(row, reqId) {
+            const reqName = row.getAttribute('data-req-name-full') || 'N/A';
+            const activityName = row.getAttribute('data-activity-full') || 'N/A';
+            const reqText = row.getAttribute('data-req-text') || 'Requirement text not available';
+            const gap = parseFloat(row.getAttribute('data-gap')) || 0;
+            
+            // Get scores from table cells
+            const scoreCells = row.querySelectorAll('.score-cell');
+            const algorithmScore = scoreCells[0] ? parseFloat(scoreCells[0].textContent) : 0;
+            const manualScore = scoreCells[1] ? parseFloat(scoreCells[1].textContent) : 0;
+            
+            // Parse manual data - FIXED VERSION
+            let manualActivityNames = [];
+            try {
+                const manualMatchesData = row.getAttribute('data-manual-matches');
+                if (manualMatchesData && manualMatchesData !== 'null' && manualMatchesData !== '[]') {
+                    manualActivityNames = JSON.parse(manualMatchesData); // FIX: Use data-manual-matches directly
+                }
+            } catch (e) {
+                console.error('Could not parse manual data for gaps:', e);
+            }
+            
+            // Get enhanced requirement text
+            let enhancedReqText = reqText;
+            if (reqText === 'Requirement text not available' || reqText.includes('not available')) {
+                enhancedReqText = getRequirementText(reqId);
+            }
+
+            return `
+                <div class="modal-header">
+                    <h3>Score Gap Analysis: ${reqId}</h3>
+                    <div class="modal-field"><strong>Requirement:</strong> ${reqName}</div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Requirement Specification</h4>
+                    <div class="req-text-box">${enhancedReqText}</div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Activity Comparison</h4>
+                    <div class="activity-text-box">
+                        <strong>Activity:</strong> ${activityName}
+                    </div>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Score Comparison</h4>
+                    <table class="score-comparison-table">
+                        <tr>
+                            <td><strong>Algorithm Score:</strong></td>
+                            <td>${algorithmScore.toFixed(3)}</td>
+                            <td>${algorithmScore > 1.5 ? 'Very High' : algorithmScore > 0.8 ? 'High' : algorithmScore > 0.4 ? 'Medium' : 'Low'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Manual Score:</strong></td>
+                            <td>${manualScore.toFixed(3)}</td>
+                            <td>${manualScore > 1.5 ? 'Very Strong' : manualScore > 0.8 ? 'Strong' : manualScore > 0.4 ? 'Moderate' : 'Weak'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Gap (Algorithm - Manual):</strong></td>
+                            <td><strong>${gap >= 0 ? '+' : ''}${gap.toFixed(3)}</strong></td>
+                            <td><strong>${gap > 0.5 ? 'Large Positive Gap' : gap > 0.2 ? 'Medium Positive Gap' : gap > -0.2 ? 'Small Gap' : gap > -0.5 ? 'Medium Negative Gap' : 'Large Negative Gap'}</strong></td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Manual Analysis Context</h4>
+                    ${manualActivityNames && manualActivityNames.length > 0 ? `
+                        <div class="manual-context">
+                            <p><strong>Manual Activities Identified (${manualActivityNames.length}):</strong></p>
+                            <ul class="manual-activities-list">
+                                ${manualActivityNames.map(activity => `<li>${activity}</li>`).join('')}
+                            </ul>
+                            <p><strong>Combined Manual Assessment:</strong> ${manualScore.toFixed(3)} (${manualScore > 0.8 ? 'Strong matches found' : manualScore > 0.5 ? 'Moderate matches found' : manualScore > 0.2 ? 'Weak matches found' : 'No strong matches'})</p>
+                        </div>
+                    ` : `
+                        <div class="manual-context">
+                            <p><strong>Manual Score:</strong> ${manualScore.toFixed(3)}</p>
+                            <p><strong>Note:</strong> Manual activity details are not available in the current dataset.</p>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="modal-section">
+                    <h4>Gap Analysis</h4>
+                    <div class="gap-analysis">
+                        <p><strong>Gap Interpretation:</strong></p>
+                        <p>${gap > 0.5 ? 
+                            `Algorithm significantly overestimated this match (${gap.toFixed(3)} points higher). This suggests the algorithm may be detecting surface-level patterns that don't represent true semantic relationships.` :
+                        gap > 0.2 ? 
+                            `Algorithm moderately overestimated this match (${gap.toFixed(3)} points higher). This warrants investigation to understand the disagreement.` :
+                        gap > -0.2 ? 
+                            `Algorithm and manual assessments are well-aligned (gap: ${gap.toFixed(3)}). This indicates good algorithm calibration.` :
+                        gap > -0.5 ? 
+                            `Algorithm moderately underestimated this match (${Math.abs(gap).toFixed(3)} points lower). The algorithm may be missing semantic nuances.` :
+                            `Algorithm significantly underestimated this match (${Math.abs(gap).toFixed(3)} points lower). This indicates potential algorithm blind spots.`
+                        }</p>
+                        
+                        <p><strong>Implications for Algorithm Performance:</strong></p>
+                        <p>${gap > 0.3 ? 
+                            'Focus on reducing false positives - algorithm may need better semantic understanding training.' :
+                        gap < -0.3 ? 
+                            'Focus on improving recall - algorithm may need exposure to more diverse matching patterns.' :
+                            'Performance is well-calibrated - continue monitoring for consistency across requirements.'
+                        }</p>
+                    </div>
+                </div>
+            `;
+        }
+        // UNIFIED MODAL SYSTEM
+        function showRowDetails(row, modalType = 'predictions') {
+            const reqId = row.getAttribute('data-req-id');
+            if (!reqId) {
+                console.error('No requirement ID found for row');
+                return;
+            }
+
+            let modalContent = '';
+            
+            try {
+                switch(modalType) {
+                    case 'predictions':
+                        modalContent = createPredictionsModal(row, reqId);
+                        break;
+                    case 'discovery':
+                        modalContent = createDiscoveryModal(row, reqId);
+                        break;
+                    case 'gaps':
+                        modalContent = createGapsModal(row, reqId);
+                        break;
+                    default:
+                        modalContent = createPredictionsModal(row, reqId);
+                        break;
+                }
+            } catch (error) {
+                console.error('Error creating modal content:', error);
+                modalContent = `
+                    <div class="modal-header">
+                        <h3>Error Loading Details</h3>
+                    </div>
+                    <div class="modal-section">
+                        <p>Unable to load detailed information for ${reqId}.</p>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p>Please check the console for more details.</p>
+                    </div>
+                `;
+            }
+
+            document.getElementById('modal-body').innerHTML = modalContent;
+            document.getElementById('row-detail-modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('row-detail-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('row-detail-modal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
+
+        // Initialize dashboard when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Requirements Traceability Dashboard loaded successfully');
+            
+            // Attach click handlers to all data rows
+            document.querySelectorAll('#predictions-table .data-row').forEach(row => {
+                row.addEventListener('click', () => showRowDetails(row, 'predictions'));
+            });
+            
+            document.querySelectorAll('#discovery-table .data-row').forEach(row => {
+                row.addEventListener('click', () => showRowDetails(row, 'discovery'));
+            });
+            
+            document.querySelectorAll('#gaps-table .data-row').forEach(row => {
+                row.addEventListener('click', () => showRowDetails(row, 'gaps'));
+            });
+            
+            // Add keyboard support for modal
             document.addEventListener('keydown', function(event) {
                 if (event.key === 'Escape') {
                     closeModal();
                 }
             });
-        });
-        """
+        });        """

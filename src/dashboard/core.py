@@ -69,18 +69,21 @@ class UnifiedEvaluationDashboard:
     def create_dashboard(self, dashboard_name: str = "unified_evaluation_dashboard") -> str:
         """Create unified HTML dashboard and return file path."""
         
-        # Use existing evaluation results - no re-evaluation!
-        if self.evaluation_results:
-            print(f"✓ Using existing evaluation results with {len(self.evaluation_results.get('aggregate_metrics', {}))} metrics")
-        else:
-            print(f"✓ Using exploration mode (no evaluation results)")
+        print(f"\n🔍 DASHBOARD CORE DEBUG:")
+        print(f"  - Enhanced predictions_df shape: {self.predictions_df.shape}")
+        print(f"  - Requirements_df provided: {self.requirements_df is not None}")
+        if self.requirements_df is not None:
+            print(f"  - Requirements_df shape: {self.requirements_df.shape}")
         
         # Process data with existing evaluation results
         processed_data = self.data_processor.process_evaluation_data(
-            self.evaluation_results,  # ← Use passed evaluation results
+            self.evaluation_results,
             self.predictions_df, 
             self.requirements_df
         )
+        
+        print(f"  - Processed data keys: {list(processed_data.keys())}")
+        print(f"  - Predictions data length: {len(processed_data.get('predictions_data', []))}")
         
         # Add capability info to processed data
         processed_data['capabilities'] = self.capabilities
@@ -89,10 +92,14 @@ class UnifiedEvaluationDashboard:
         charts = self.chart_generator.create_all_charts(processed_data)
         tables = self.table_generator.create_all_tables(processed_data)
         
+        print(f"  - Generated tables: {list(tables.keys())}")
+        
         # Build HTML with capabilities
         html_content = self.template_generator.build_dashboard_html(
             processed_data, charts, tables, self.capabilities
         )
+        
+        print(f"  - Generated HTML length: {len(html_content)} characters")
         
         # Save dashboard
         dashboard_path = self.output_dir / f"{dashboard_name}.html"

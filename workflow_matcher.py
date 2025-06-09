@@ -10,6 +10,11 @@ import logging
 from pathlib import Path
 from typing import Dict, Optional, Any
 from datetime import datetime
+import os
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
+os.environ['OMP_NUM_THREADS'] = '2'  # TRF can use 2 threads efficiently  
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
 
 # Import core components
 from src.matching.matcher import FinalCleanMatcher

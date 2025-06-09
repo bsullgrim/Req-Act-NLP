@@ -36,7 +36,7 @@ class QualityMetrics:
 class RequirementAnalyzer:
     """Enhanced requirements quality analyzer with CSV and Excel output capabilities"""
     
-    def __init__(self, spacy_model: str = "en_core_web_sm"):
+    def __init__(self, spacy_model: str = "en_core_web_trf", repo_manager=None):
         try:
             self.nlp = spacy.load(spacy_model)
             logger.info(f"Loaded spaCy model: {spacy_model}")

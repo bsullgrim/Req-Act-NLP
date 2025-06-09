@@ -55,7 +55,12 @@ class ChartGenerator:
         
         if discovery_data:
             try:
-                charts.update(self._create_discovery_charts(discovery_data, processed_data.get('score_distributions', {})))
+                # MODIFY THIS CALL - ADD coverage_data parameter
+                charts.update(self._create_discovery_charts(
+                    discovery_data, 
+                    processed_data.get('score_distributions', {}),
+                    processed_data.get('coverage_data', {})  # NEW: Add coverage_data
+                ))
             except Exception as e:
                 print(f"⚠️ Discovery charts failed: {e}")
         
@@ -195,12 +200,13 @@ class ChartGenerator:
         
         return charts
     
-    def _create_discovery_charts(self, discovery_data: Dict, score_dist_data: Dict) -> Dict[str, str]:
+    def _create_discovery_charts(self, discovery_data: Dict, score_dist_data: Dict, 
+                            coverage_data: Dict = None) -> Dict[str, str]:
         """Create discovery analysis charts."""
         charts = {}
         
-        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
-        
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))        
+
         # 1. Discovery Summary
         summary = discovery_data.get('summary', {})
         categories = ['High-Scoring\nDiscoveries', 'Requirements\nwith Discoveries', 'Score\nGaps Found']
@@ -246,10 +252,22 @@ class ChartGenerator:
                            label=f"Algorithm Mean: {non_manual['mean']:.3f}")
                 ax2.legend(fontsize=9)
         
-        # 3. Discovery Rate Analysis
+        # 3. Discovery Rate Analysis - THIS IS WHERE THE FIX GOES
+        summary = discovery_data.get('summary', {})
         discovery_rate = summary.get('discovery_rate', 0)
-        # Placeholder for coverage rate - you'd get this from processed_data
-        coverage_rate = 0.8  # This should come from your data
+        
+        # NEW: Multi-layered coverage rate calculation
+        coverage_rate = discovery_data.get('coverage_rate', 0.0)
+        
+        if coverage_rate == 0 and coverage_data:
+            # Your suggested fallback: calculate from coverage data
+            req_coverage = coverage_data.get('requirements_coverage', {})
+            if req_coverage.get('total_requirements', 0) > 0:
+                total_reqs = req_coverage['total_requirements']
+                covered_reqs = (req_coverage.get('high_confidence', {}).get('count', 0) +
+                            req_coverage.get('medium_confidence', {}).get('count', 0) +
+                            req_coverage.get('low_confidence', {}).get('count', 0))
+                coverage_rate = covered_reqs / total_reqs if total_reqs > 0 else 0
 
         metrics = ['Discovery Rate', 'Requirement\nCoverage']
         rates = [discovery_rate, coverage_rate]
@@ -266,8 +284,7 @@ class ChartGenerator:
         
         for bar, rate in zip(bars, rates):
             ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.02, 
-                    f'{rate:.1%}', ha='center', va='bottom', fontweight='bold')
-        
+                    f'{rate:.1%}', ha='center', va='bottom', fontweight='bold')        
         # 4. Score Quality Histogram
         high_scoring_misses = discovery_data.get('high_scoring_misses', [])
         if high_scoring_misses:

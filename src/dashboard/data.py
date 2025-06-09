@@ -18,7 +18,21 @@ class DataProcessor:
                               predictions_df: pd.DataFrame,
                               requirements_df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """Main data processing pipeline."""
-        
+        exploration_coverage_rate = 0.0
+        if not evaluation_results.get('coverage'):
+            # Calculate what percentage of unique requirements have at least one match
+            if 'ID' in predictions_df.columns:
+                # Initialize total_unique_reqs first
+                total_unique_reqs = predictions_df['ID'].nunique()
+                
+                # Use requirements_df count if available and non-empty (more accurate)
+                if requirements_df is not None and len(requirements_df) > 0:
+                    total_unique_reqs = len(requirements_df)
+                
+                # All requirements in predictions_df have at least one match by definition
+                covered_reqs = predictions_df['ID'].nunique()
+                exploration_coverage_rate = covered_reqs / total_unique_reqs if total_unique_reqs > 0 else 0.0
+
         processed = {
             'metadata': self._extract_metadata(evaluation_results),
             'performance_metrics': self._process_performance_metrics(evaluation_results),
@@ -29,7 +43,9 @@ class DataProcessor:
             'quality_data': self._extract_quality_data(predictions_df),
             'coverage_data': self._generate_coverage_analysis(predictions_df, requirements_df)
         }
-        
+        if processed['discovery_data'].get('coverage_rate', 0) == 0 and exploration_coverage_rate > 0:
+            processed['discovery_data']['coverage_rate'] = exploration_coverage_rate
+
         return processed
     
     def _extract_metadata(self, results: Dict) -> Dict[str, Any]:
@@ -89,6 +105,8 @@ class DataProcessor:
         
         return metrics
     
+
+
     def _process_discovery_data(self, results: Dict) -> Dict[str, Any]:
         """Process discovery analysis data."""
         if 'discovery_analysis' not in results:
@@ -96,38 +114,129 @@ class DataProcessor:
         
         discovery = results['discovery_analysis']
         
+        # Calculate coverage rate from evaluation results when available
+        coverage_rate = 0.0
+        if 'coverage' in results:
+            coverage_rate = results['coverage']
+        elif 'total_requirements' in results and 'covered_requirements' in results:
+            total_reqs = results['total_requirements']
+            covered_reqs = results['covered_requirements'] 
+            coverage_rate = covered_reqs / total_reqs if total_reqs > 0 else 0.0
+        
+        # Get ground truth for manual matches lookup
+        ground_truth = results.get('ground_truth', {})
+        
+        # Enhance high_scoring_misses with manual match info
+        enhanced_misses = []
+        for miss in discovery.get('high_scoring_misses', []):
+            enhanced_miss = miss.copy()
+            
+            # Add manual matches for this requirement
+            req_id = miss['requirement_id']
+            manual_matches = []
+            if req_id in ground_truth:
+                manual_matches = [item['original_activity'] for item in ground_truth[req_id]]
+            
+            enhanced_miss['manual_matches'] = manual_matches
+            enhanced_misses.append(enhanced_miss)
+        
+        # Enhance score_gaps with manual match info
+        enhanced_gaps = []
+        for gap in discovery.get('score_gaps', []):
+            enhanced_gap = gap.copy()
+            
+            # Add manual matches for this requirement
+            req_id = gap['requirement_id']
+            manual_matches = []
+            if req_id in ground_truth:
+                manual_matches = [item['original_activity'] for item in ground_truth[req_id]]
+            
+            enhanced_gap['manual_matches'] = manual_matches
+            enhanced_gaps.append(enhanced_gap)
+        
         return {
-            'high_scoring_misses': discovery.get('high_scoring_misses', []),
-            'score_gaps': discovery.get('score_gaps', []),
+            'high_scoring_misses': enhanced_misses,
+            'score_gaps': enhanced_gaps,
             'summary': discovery.get('summary', {}),
-            'top_examples': sorted(
-                discovery.get('high_scoring_misses', []), 
-                key=lambda x: x['score'], 
-                reverse=True
-            )[:20]
+            'coverage_rate': coverage_rate,  # NOW coverage_rate is defined
+            'top_examples': sorted(enhanced_misses, key=lambda x: x['score'], reverse=True)[:20]
         }
+
     
     def _process_predictions_data(self, predictions_df: pd.DataFrame, 
                                 requirements_df: Optional[pd.DataFrame] = None) -> List[Dict]:
-        """Process and enrich predictions data."""
+        """Process and enrich predictions data - WITH DEBUGGING."""
+        
+        print(f"\n🔍 PREDICTIONS DATA PROCESSOR DEBUG:")
+        print(f"  - Input predictions_df shape: {predictions_df.shape}")
+        print(f"  - Input predictions_df columns: {list(predictions_df.columns)}")
+        print(f"  - First 3 rows preview:")
+        for i, (_, row) in enumerate(predictions_df.head(3).iterrows()):
+            print(f"    Row {i}: {dict(row)}")
         
         # Standardize column names
         id_col = 'ID' if 'ID' in predictions_df.columns else 'requirement_id'
         activity_col = 'Activity Name' if 'Activity Name' in predictions_df.columns else 'activity_name'
         score_col = 'Combined Score' if 'Combined Score' in predictions_df.columns else 'score'
         
+        print(f"  - Using columns: id='{id_col}', activity='{activity_col}', score='{score_col}'")
+        
+        # NEW: Create requirement name lookup from requirements_df if available
+        req_name_lookup = {}
+        req_text_lookup = {}
+        if requirements_df is not None:
+            print(f"  - Requirements_df shape: {requirements_df.shape}")
+            print(f"  - Requirements_df columns: {list(requirements_df.columns)}")
+            
+            req_id_col = 'ID' if 'ID' in requirements_df.columns else 'requirement_id'
+            req_name_col = None
+            req_text_col = None
+            
+            # Find requirement name column
+            for col in ['Requirement Name', 'Name', 'Requirement_Name', 'requirement_name']:
+                if col in requirements_df.columns:
+                    req_name_col = col
+                    print(f"  - Found requirement name column: {col}")
+                    break
+            
+            # Find requirement text column  
+            for col in ['Requirement Text', 'Text', 'Requirement_Text', 'requirement_text', 'Description']:
+                if col in requirements_df.columns:
+                    req_text_col = col
+                    print(f"  - Found requirement text column: {col}")
+                    break
+            
+            if req_name_col:
+                req_name_lookup = dict(zip(requirements_df[req_id_col].astype(str), 
+                                        requirements_df[req_name_col].fillna('N/A')))
+                print(f"  - Created name lookup with {len(req_name_lookup)} entries")
+            
+            if req_text_col:
+                req_text_lookup = dict(zip(requirements_df[req_id_col].astype(str), 
+                                        requirements_df[req_text_col].fillna('N/A')))
+                print(f"  - Created text lookup with {len(req_text_lookup)} entries")
+        
         processed_predictions = []
         
-        for _, row in predictions_df.iterrows():
+        print(f"  - Processing {len(predictions_df)} prediction rows...")
+        
+        for idx, (_, row) in enumerate(predictions_df.iterrows()):
+            req_id = str(row[id_col])
+            
             # Basic data
             pred_data = {
-                'requirement_id': str(row[id_col]),
+                'requirement_id': req_id,
                 'activity_name': str(row[activity_col]),
                 'combined_score': row.get(score_col, 0),
-                'requirement_name': row.get('Requirement Name', 'N/A'),
-                'requirement_text': row.get('Requirement Text', 'N/A')
+                # NEW: Try predictions_df first, then lookup, then fallback
+                'requirement_name': (row.get('Requirement Name') or 
+                                req_name_lookup.get(req_id) or 
+                                f"Requirement {req_id}"),
+                'requirement_text': (row.get('Requirement Text') or 
+                                req_text_lookup.get(req_id) or 
+                                'Requirement text not available')
             }
-            
+                
             # Component scores
             pred_data.update({
                 'semantic_score': row.get('Dense Semantic', row.get('Semantic Score', 0)),
@@ -147,9 +256,18 @@ class DataProcessor:
                 pred_data['score_class'] = 'low'
             
             processed_predictions.append(pred_data)
+            
+            # Debug first few predictions
+            if idx < 3:
+                print(f"    Processed prediction {idx}: {req_id} -> {pred_data['activity_name'][:50]}...")
         
-        return processed_predictions
-    
+        print(f"✅ PREDICTIONS PROCESSOR RESULT: {len(processed_predictions)} predictions processed")
+        print(f"  - Sample processed data:")
+        if processed_predictions:
+            sample = processed_predictions[0]
+            print(f"    {sample['requirement_id']}: {sample['activity_name'][:30]}... (score: {sample['combined_score']})")
+        
+        return processed_predictions    
     def _process_score_distributions(self, results: Dict) -> Dict[str, Any]:
         """Process score distribution data."""
         return results.get('score_distributions', {})

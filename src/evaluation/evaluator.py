@@ -257,7 +257,7 @@ class EnhancedMatchingEvaluator:
         return enhanced_df
     
     def _compute_evaluation_metrics(self, enhanced_df: pd.DataFrame) -> Dict[str, Any]:
-        """Compute evaluation metrics against ground truth."""
+        """Compute evaluation metrics against ground truth with FIXED manual matches."""
         
         if not self.has_ground_truth:
             return {}
@@ -294,7 +294,7 @@ class EnhancedMatchingEvaluator:
         for req_id in req_predictions:
             req_predictions[req_id].sort(key=lambda x: x['score'], reverse=True)
         
-        # Compute metrics
+        # COMPUTE METRICS WITH ENHANCED DISCOVERY DATA
         metrics = {}
         k_values = [1, 3, 5, 10]
         
@@ -307,7 +307,7 @@ class EnhancedMatchingEvaluator:
         total_requirements = 0
         covered_requirements = 0
         
-        # Discovery analysis
+        # ENHANCED Discovery analysis with proper manual matches
         high_scoring_misses = []
         score_gaps = []
         
@@ -316,6 +316,7 @@ class EnhancedMatchingEvaluator:
             
             # Get ground truth activities for this requirement
             gt_activities = set(item['activity_name'] for item in self.ground_truth[req_id])
+            gt_original_activities = [item['original_activity'] for item in self.ground_truth[req_id]]
             
             # Get predictions for this requirement
             predictions = req_predictions.get(req_id, [])
@@ -323,25 +324,22 @@ class EnhancedMatchingEvaluator:
             if predictions:
                 covered_requirements += 1
                 
-                # Compute metrics for each k
+                # Compute standard metrics...
                 for k in k_values:
                     top_k_activities = set(pred['activity'] for pred in predictions[:k])
                     
-                    # Precision@k
                     if top_k_activities:
                         precision_k = len(top_k_activities & gt_activities) / len(top_k_activities)
                     else:
                         precision_k = 0.0
                     all_precision_at_k[k].append(precision_k)
                     
-                    # Recall@k
                     if gt_activities:
                         recall_k = len(top_k_activities & gt_activities) / len(gt_activities)
                     else:
                         recall_k = 0.0
                     all_recall_at_k[k].append(recall_k)
                     
-                    # F1@k
                     if precision_k + recall_k > 0:
                         f1_k = 2 * precision_k * recall_k / (precision_k + recall_k)
                     else:
@@ -367,35 +365,43 @@ class EnhancedMatchingEvaluator:
                         break
                 all_mrr.append(mrr_score)
                 
-                # Discovery analysis - find high-scoring misses
+                # ENHANCED Discovery analysis - find high-scoring misses WITH MANUAL MATCHES
                 for pred in predictions:
                     if pred['activity'] not in gt_activities and pred['score'] > 0.5:
                         high_scoring_misses.append({
                             'requirement_id': req_id,
                             'activity_name': pred['original_activity'],
                             'score': pred['score'],
-                            'manual_matches_count': len(gt_activities)
+                            'manual_matches_count': len(gt_activities),  # CORRECT: count of manual matches
+                            'manual_matches': gt_original_activities,     # ENHANCED: actual manual matches list
+                            'ground_truth_activities': gt_original_activities  # BACKUP: ensure we have the data
                         })
                 
-                # Score gaps analysis
+                # ENHANCED Score gaps analysis WITH MANUAL MATCHES
                 if predictions and gt_activities:
                     max_miss_score = max((pred['score'] for pred in predictions 
                                         if pred['activity'] not in gt_activities), default=0)
                     min_manual_score = min((pred['score'] for pred in predictions 
-                                          if pred['activity'] in gt_activities), default=float('inf'))
+                                        if pred['activity'] in gt_activities), default=float('inf'))
                     
                     if max_miss_score > min_manual_score and min_manual_score != float('inf'):
                         gap = max_miss_score - min_manual_score
+                        
+                        # Find the specific activity that caused the gap
+                        max_miss_activity = next(pred['original_activity'] for pred in predictions 
+                                            if pred['activity'] not in gt_activities and pred['score'] == max_miss_score)
+                        
                         score_gaps.append({
                             'requirement_id': req_id,
                             'max_miss_score': max_miss_score,
                             'min_manual_score': min_manual_score,
                             'gap': gap,
-                            'max_miss_activity': next(pred['original_activity'] for pred in predictions 
-                                                    if pred['activity'] not in gt_activities and pred['score'] == max_miss_score)
+                            'max_miss_activity': max_miss_activity,
+                            'manual_matches': gt_original_activities,     # ENHANCED: include manual matches
+                            'manual_matches_count': len(gt_activities)    # CORRECT: count manual matches
                         })
         
-        # Aggregate metrics
+        # Aggregate metrics (unchanged)
         aggregate_metrics = {}
         for k in k_values:
             aggregate_metrics[f'precision_at_{k}'] = {
@@ -423,7 +429,7 @@ class EnhancedMatchingEvaluator:
         # Coverage
         coverage = covered_requirements / total_requirements if total_requirements > 0 else 0.0
         
-        # Discovery summary
+        # ENHANCED Discovery summary
         discovery_summary = {
             'total_high_scoring_misses': len(high_scoring_misses),
             'requirements_with_high_misses': len(set(miss['requirement_id'] for miss in high_scoring_misses)),
@@ -434,23 +440,27 @@ class EnhancedMatchingEvaluator:
         # Score distribution analysis for dashboard charts
         score_distributions = self._compute_score_distributions(req_predictions)
         
+        print(f"✅ ENHANCED DISCOVERY ANALYSIS:")
+        print(f"  - High scoring misses: {len(high_scoring_misses)}")
+        print(f"  - Score gaps: {len(score_gaps)}")
+        print(f"  - Sample manual matches for first discovery: {high_scoring_misses[0]['manual_matches'][:3] if high_scoring_misses else 'None'}")
+        
         evaluation_results = {
             'aggregate_metrics': aggregate_metrics,
             'coverage': coverage,
             'total_requirements': total_requirements,
             'covered_requirements': covered_requirements,
             'discovery_analysis': {
-                'high_scoring_misses': high_scoring_misses,
-                'score_gaps': score_gaps,
+                'high_scoring_misses': high_scoring_misses,    # ENHANCED with manual matches
+                'score_gaps': score_gaps,                      # ENHANCED with manual matches  
                 'summary': discovery_summary
             },
-            'score_distributions': score_distributions  # Add this for dashboard charts
+            'score_distributions': score_distributions
         }
         
         logger.info(f"✅ Evaluation metrics computed. F1@5: {aggregate_metrics.get('f1_at_5', {}).get('mean', 0):.3f}")
         
-        return evaluation_results
-    
+        return evaluation_results    
     def _compute_score_distributions(self, req_predictions: Dict) -> Dict[str, Any]:
         """Compute score distributions for manual vs algorithm comparison chart."""
         

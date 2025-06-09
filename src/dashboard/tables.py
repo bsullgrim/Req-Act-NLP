@@ -3,9 +3,11 @@ Table Generation - Create HTML tables for dashboard
 """
 
 from typing import Dict, List, Any
+import html
+import json
 
 class TableGenerator:
-    """Generates all dashboard tables."""
+    """Generates all dashboard tables - simplified version."""
     
     def create_all_tables(self, processed_data: Dict[str, Any]) -> Dict[str, str]:
         """Create all tables and return as HTML strings."""
@@ -17,6 +19,9 @@ class TableGenerator:
         quality_data = processed_data.get('quality_data', {})
         coverage_data = processed_data.get('coverage_data', {})
         
+        print(f"🔍 TableGenerator Debug:")
+        print(f"  - predictions_data length: {len(predictions_data)}")
+        
         if performance_data:
             tables['performance_summary'] = self._create_performance_table(performance_data)
         
@@ -25,6 +30,7 @@ class TableGenerator:
         
         if predictions_data:
             tables['all_predictions'] = self._create_predictions_table(predictions_data)
+            print(f"✅ Created predictions table with {len(predictions_data)} rows")
         
         if discovery_data.get('high_scoring_misses'):
             tables['discovery_results'] = self._create_discovery_results_table(discovery_data['high_scoring_misses'])
@@ -32,16 +38,290 @@ class TableGenerator:
         if discovery_data.get('score_gaps'):
             tables['score_gaps'] = self._create_score_gaps_table(discovery_data['score_gaps'])
         
-        # Quality analysis table
         if quality_data.get('has_quality_data', False):
             tables['quality_analysis'] = self._create_quality_analysis_table(quality_data)
         
-        # Coverage analysis table  
         if coverage_data.get('has_coverage_data', False):
             tables['coverage_analysis'] = self._create_coverage_analysis_table(coverage_data)
         
         return tables
     
+    def _escape_for_html_attr(self, text: str) -> str:
+        """Safely escape text for HTML attributes."""
+        if not text:
+            return ""
+        return html.escape(str(text), quote=True)
+    
+    def _create_predictions_table(self, predictions_data: List[Dict]) -> str:
+        """Create predictions table with PROPER click handlers."""
+        
+        print(f"🔧 Creating predictions table with {len(predictions_data)} predictions")
+        
+        html_content = f"""
+        <div class="table-controls">
+            <div class="search-box">
+                <input type="text" id="predictions-search" placeholder="Search requirements, activities..." 
+                       onkeyup="searchPredictionsTable()" class="search-input">
+                <span class="search-icon">🔍</span>
+            </div>
+            <div class="filter-controls">
+                <button onclick="exportPredictionsTable()" class="export-btn">📊 Export CSV</button>
+                <button onclick="showAllRows()" class="export-btn">👁️ Show All</button>
+            </div>
+        </div>
+        
+        <div class="table-wrapper">
+            <table id="predictions-table" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortPredictionsTable(0)" class="sortable">Req ID <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortPredictionsTable(1)" class="sortable">Requirement Name <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortPredictionsTable(2)" class="sortable">Activity Name <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortPredictionsTable(3)" class="sortable">Combined Score <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortPredictionsTable(4)" class="sortable">Semantic <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortPredictionsTable(5)" class="sortable">BM25 <span class="sort-arrow">↕</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        # Generate table rows with PROPER escaping and click handlers
+        for item in predictions_data:
+            # Truncate for display
+            req_name_display = item['requirement_name'][:50] + "..." if len(item['requirement_name']) > 50 else item['requirement_name']
+            activity_display = item['activity_name'][:80] + "..." if len(item['activity_name']) > 80 else item['activity_name']
+            
+            # Escape data for HTML attributes - CRITICAL FIX
+            req_text_escaped = self._escape_for_html_attr(item['requirement_text'])
+            req_name_escaped = self._escape_for_html_attr(item['requirement_name'])
+            activity_escaped = self._escape_for_html_attr(item['activity_name'])
+            req_id_escaped = self._escape_for_html_attr(item['requirement_id'])
+            
+            # Escape for display in title attributes
+            req_name_title = self._escape_for_html_attr(item['requirement_name'])
+            activity_title = self._escape_for_html_attr(item['activity_name'])
+            
+            html_content += f"""
+                <tr class="data-row {item['score_class']}" 
+                    data-req-id="{req_id_escaped}" 
+                    data-combined-score="{item['combined_score']}"
+                    data-req-name-full="{req_name_escaped}"
+                    data-activity-full="{activity_escaped}"
+                    data-req-text="{req_text_escaped}"
+                    onclick="showRowDetails(this, 'predictions')"
+                    style="cursor: pointer;">
+                    <td class="req-id">{item['requirement_id']}</td>
+                    <td class="req-name" title="{req_name_title}">{req_name_display}</td>
+                    <td class="activity-name" title="{activity_title}">{activity_display}</td>
+                    <td class="score-cell"><strong>{item['combined_score']:.3f}</strong></td>
+                    <td class="score-cell">{item['semantic_score']:.3f}</td>
+                    <td class="score-cell">{item['bm25_score']:.3f}</td>
+                </tr>
+            """
+        
+        html_content += f"""
+                </tbody>
+            </table>
+        </div>
+        <div class="table-info">
+            <span id="predictions-count">Showing {len(predictions_data)} results</span>
+        </div>
+        """
+        
+        print(f"✅ Generated HTML for {len(predictions_data)} prediction rows with click handlers")
+        return html_content
+    
+    def _create_discovery_results_table(self, discovery_results: List[Dict]) -> str:
+        """Create discovery results table with proper click handlers."""
+        
+        html_content = f"""
+        <div class="table-controls">
+            <div class="search-box">
+                <input type="text" id="discovery-search" placeholder="Search discovery results..." 
+                    onkeyup="searchDiscoveryTable()" class="search-input">
+                <span class="search-icon">🔍</span>
+            </div>
+            <div class="filter-controls">
+                <button onclick="exportDiscoveryTable()" class="export-btn">📊 Export CSV</button>
+            </div>
+        </div>
+        
+        <div class="table-wrapper">
+            <table id="discovery-table" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortDiscoveryTable(0)" class="sortable">Req ID <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortDiscoveryTable(1)" class="sortable">Activity Name <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortDiscoveryTable(2)" class="sortable">Discovery Score <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortDiscoveryTable(3)" class="sortable">Manual Matches Count <span class="sort-arrow">↕</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        for item in discovery_results:
+            activity_display = item['activity_name'][:80] + "..." if len(item['activity_name']) > 80 else item['activity_name']
+            score_class = "high-score" if item['score'] > 1.0 else "medium-score"
+            
+            # Get manual matches count and list
+            manual_matches_count = item.get('manual_matches_count', 0)
+            manual_matches_list = self._get_manual_matches_list(item)
+            
+            # Get requirement info
+            req_name = self._get_requirement_name(item)
+            req_text = self._get_requirement_text(item)
+            
+            # Escape for HTML attributes
+            req_id_escaped = self._escape_for_html_attr(item['requirement_id'])
+            req_name_escaped = self._escape_for_html_attr(req_name)
+            activity_escaped = self._escape_for_html_attr(item['activity_name'])
+            req_text_escaped = self._escape_for_html_attr(req_text)
+            manual_matches_json = self._escape_for_html_attr(json.dumps(manual_matches_list))
+            
+            # Title attributes for hover
+            activity_title = self._escape_for_html_attr(item['activity_name'])
+            
+            html_content += f"""
+                <tr class="data-row" 
+                    data-req-id="{req_id_escaped}" 
+                    data-score="{item['score']}"
+                    data-req-name-full="{req_name_escaped}"
+                    data-activity-full="{activity_escaped}"
+                    data-manual-matches="{manual_matches_json}"
+                    data-req-text="{req_text_escaped}"
+                    onclick="showRowDetails(this, 'discovery')"
+                    style="cursor: pointer;">
+                    <td class="req-id">{item['requirement_id']}</td>
+                    <td class="activity-name" title="{activity_title}">{activity_display}</td>
+                    <td class="score-cell {score_class}"><strong>{item['score']:.3f}</strong></td>
+                    <td class="manual-count">{manual_matches_count}</td>
+                </tr>
+            """
+        
+        html_content += f"""
+                </tbody>
+            </table>
+        </div>
+        <div class="table-info">
+            <span id="discovery-count">Showing {len(discovery_results)} results</span>
+        </div>
+        """
+        
+        return html_content
+    
+    def _create_score_gaps_table(self, score_gaps: List[Dict]) -> str:
+        """Create score gaps table with proper click handlers."""
+        
+        html_content = f"""
+        <div class="table-controls">
+            <div class="search-box">
+                <input type="text" id="gaps-search" placeholder="Search score gaps..." 
+                    onkeyup="searchGapsTable()" class="search-input">
+                <span class="search-icon">🔍</span>
+            </div>
+            <div class="filter-controls">
+                <button onclick="exportGapsTable()" class="export-btn">📊 Export CSV</button>
+            </div>
+        </div>
+        
+        <div class="table-wrapper">
+            <table id="gaps-table" class="sortable-table">
+                <thead>
+                    <tr>
+                        <th onclick="sortGapsTable(0)" class="sortable">Req ID <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortGapsTable(1)" class="sortable">Best Algorithm Activity <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortGapsTable(2)" class="sortable">Algorithm Score <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortGapsTable(3)" class="sortable">Manual Score <span class="sort-arrow">↕</span></th>
+                        <th onclick="sortGapsTable(4)" class="sortable">Gap <span class="sort-arrow">↕</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+        """
+        
+        for item in score_gaps:
+            activity_display = item['max_miss_activity'][:80] + "..." if len(item['max_miss_activity']) > 80 else item['max_miss_activity']
+            gap = item['gap']
+            gap_class = "high-score" if gap > 0.5 else "medium-score" if gap > 0.2 else ""
+            
+            # Get manual matches and requirement info
+            manual_matches_list = self._get_manual_matches_list(item)
+            req_name = self._get_requirement_name(item)
+            req_text = self._get_requirement_text(item)
+            
+            # Escape for HTML attributes
+            req_id_escaped = self._escape_for_html_attr(item['requirement_id'])
+            req_name_escaped = self._escape_for_html_attr(req_name)
+            activity_escaped = self._escape_for_html_attr(item['max_miss_activity'])
+            req_text_escaped = self._escape_for_html_attr(req_text)
+            manual_matches_json = self._escape_for_html_attr(json.dumps(manual_matches_list))
+            
+            # Title attributes
+            activity_title = self._escape_for_html_attr(item['max_miss_activity'])
+            
+            html_content += f"""
+                <tr class="data-row" 
+                    data-req-id="{req_id_escaped}" 
+                    data-gap="{gap}"
+                    data-req-name-full="{req_name_escaped}"
+                    data-activity-full="{activity_escaped}"
+                    data-manual-matches="{manual_matches_json}"
+                    data-req-text="{req_text_escaped}"
+                    onclick="showRowDetails(this, 'gaps')"
+                    style="cursor: pointer;">
+                    <td class="req-id">{item['requirement_id']}</td>
+                    <td class="activity-name" title="{activity_title}">{activity_display}</td>
+                    <td class="score-cell"><strong>{item['max_miss_score']:.3f}</strong></td>
+                    <td class="score-cell">{item['min_manual_score']:.3f}</td>
+                    <td class="score-cell {gap_class}"><strong>+{gap:.3f}</strong></td>
+                </tr>
+            """
+        
+        html_content += f"""
+                </tbody>
+            </table>
+        </div>
+        <div class="table-info">
+            <span id="gaps-count">Showing {len(score_gaps)} results</span>
+        </div>
+        """
+        
+        return html_content
+    
+    def _get_requirement_name(self, item: Dict) -> str:
+        """Get requirement name from various possible sources."""
+        for key in ['requirement_name', 'Requirement Name', 'req_name', 'name']:
+            if key in item and item[key] and str(item[key]).strip() != 'N/A':
+                return str(item[key])
+        
+        req_id = item.get('requirement_id', 'Unknown')
+        return f"Requirement {req_id}"
+    
+    def _get_requirement_text(self, item: Dict) -> str:
+        """Get requirement text from various possible sources."""
+        for key in ['requirement_text', 'Requirement Text', 'req_text', 'text', 'description']:
+            if key in item and item[key] and str(item[key]).strip():
+                text = str(item[key]).strip()
+                if text != 'N/A' and text != 'Requirement text not available':
+                    return text
+        
+        return f"Requirement text not available for {item.get('requirement_id', 'Unknown')}"
+    
+    def _get_manual_matches_list(self, item: Dict) -> List[str]:
+        """Extract actual manual matches list from discovery/gap item."""
+        manual_matches = []
+        
+        # Try various possible keys for manual matches
+        for key in ['manual_matches', 'ground_truth_activities', 'manual_activities']:
+            if key in item and isinstance(item[key], list):
+                manual_matches = item[key]
+                break
+            elif key in item and isinstance(item[key], str):
+                manual_matches = [act.strip() for act in item[key].split(',') if act.strip()]
+                break
+        
+        # Return as list of strings, filtering out empty values
+        return [str(match).strip() for match in manual_matches if match and str(match).strip()]
+    # Keep other table methods unchanged...
     def _create_performance_table(self, performance_data: Dict) -> str:
         """Create performance summary table."""
         html = """
@@ -69,7 +349,6 @@ class TableGenerator:
                 html += f'<td class="{cell_class}">{value:.3f}</td>'
             html += "</tr>"
         
-        # Add MRR row
         mrr_value = performance_data.get('MRR', {}).get('mean', 0)
         html += f"""
             <tr>
@@ -80,7 +359,7 @@ class TableGenerator:
         
         html += "</tbody></table>"
         return html
-    
+
     def _create_discovery_table(self, discovery_examples: List[Dict]) -> str:
         """Create top discovery examples table."""
         html = """
@@ -118,191 +397,6 @@ class TableGenerator:
         html += "</tbody></table>"
         return html
     
-    def _create_predictions_table(self, predictions_data: List[Dict]) -> str:
-        """Create comprehensive predictions table with controls."""
-        html = f"""
-        <div class="table-controls">
-            <div class="search-box">
-                <input type="text" id="predictions-search" placeholder="Search requirements, activities..." 
-                       onkeyup="filterPredictionsTable()" class="search-input">
-                <span class="search-icon">🔍</span>
-            </div>
-            <div class="filter-controls">
-                <select id="score-filter" onchange="filterPredictionsTable()" class="filter-select">
-                    <option value="">All Scores</option>
-                    <option value="high">High (≥1.0)</option>
-                    <option value="medium">Medium (0.6-0.99)</option>
-                    <option value="low">Low (<0.6)</option>
-                </select>
-                <button onclick="exportPredictionsTable()" class="export-btn">📊 Export CSV</button>
-            </div>
-        </div>
-        
-        <div class="table-wrapper">
-            <table id="predictions-table" class="sortable-table">
-                <thead>
-                    <tr>
-                        <th onclick="sortPredictionsTable(0)" class="sortable">Req ID <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortPredictionsTable(1)" class="sortable">Requirement Name <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortPredictionsTable(2)" class="sortable">Activity Name <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortPredictionsTable(3)" class="sortable">Combined Score <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortPredictionsTable(4)" class="sortable">Semantic <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortPredictionsTable(5)" class="sortable">BM25 <span class="sort-arrow">↕</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        
-        for item in predictions_data:
-            # Truncate long texts
-            req_name_display = item['requirement_name'][:50] + "..." if len(item['requirement_name']) > 50 else item['requirement_name']
-            activity_display = item['activity_name'][:80] + "..." if len(item['activity_name']) > 80 else item['activity_name']
-            
-            html += f"""
-                <tr class="data-row {item['score_class']}" 
-                    data-req-id="{item['requirement_id']}" 
-                    data-combined-score="{item['combined_score']}"
-                    data-req-name-full="{item['requirement_name']}"
-                    data-activity-full="{item['activity_name']}"
-                    onclick="showRowDetails(this, 'predictions')">
-                    <td class="req-id">{item['requirement_id']}</td>
-                    <td class="req-name" title="{item['requirement_name']}">{req_name_display}</td>
-                    <td class="activity-name" title="{item['activity_name']}">{activity_display}</td>
-                    <td class="score-cell"><strong>{item['combined_score']:.3f}</strong></td>
-                    <td class="score-cell">{item['semantic_score']:.3f}</td>
-                    <td class="score-cell">{item['bm25_score']:.3f}</td>
-                </tr>
-            """
-        
-        html += """
-                </tbody>
-            </table>
-        </div>
-        <div class="table-info">
-            <span id="predictions-count">Showing {total} results</span>
-        </div>
-        """.format(total=len(predictions_data))
-        
-        return html
-    
-    def _create_discovery_results_table(self, discovery_results: List[Dict]) -> str:
-        """Create discovery results table with controls."""
-        html = f"""
-        <div class="table-controls">
-            <div class="search-box">
-                <input type="text" id="discovery-search" placeholder="Search discovery results..." 
-                    onkeyup="filterDiscoveryTable()" class="search-input">
-                <span class="search-icon">🔍</span>
-            </div>
-            <div class="filter-controls">
-                <button onclick="exportDiscoveryTable()" class="export-btn">📊 Export CSV</button>
-            </div>
-        </div>
-        
-        <div class="table-wrapper">
-            <table id="discovery-table" class="sortable-table">
-                <thead>
-                    <tr>
-                        <th onclick="sortDiscoveryTable(0)" class="sortable">Req ID <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortDiscoveryTable(1)" class="sortable">Requirement Name <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortDiscoveryTable(2)" class="sortable">Activity Name <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortDiscoveryTable(3)" class="sortable">Discovery Score <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortDiscoveryTable(4)" class="sortable">Manual Matches <span class="sort-arrow">↕</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        
-        for item in discovery_results:
-            req_name_display = item.get('requirement_name', 'N/A')[:50] + "..." if len(item.get('requirement_name', '')) > 50 else item.get('requirement_name', 'N/A')
-            activity_display = item['activity_name'][:80] + "..." if len(item['activity_name']) > 80 else item['activity_name']
-            
-            score_class = "high-score" if item['score'] > 1.0 else "medium-score"
-            
-            html += f"""
-                <tr class="data-row" 
-                    data-req-id="{item['requirement_id']}" 
-                    data-score="{item['score']}"
-                    onclick="showRowDetails(this, 'discovery')">
-                    <td class="req-id">{item['requirement_id']}</td>
-                    <td class="req-name" title="{item.get('requirement_name', 'N/A')}">{req_name_display}</td>
-                    <td class="activity-name" title="{item['activity_name']}">{activity_display}</td>
-                    <td class="score-cell {score_class}"><strong>{item['score']:.3f}</strong></td>
-                    <td class="manual-count">{item.get('manual_matches_count', 0)}</td>
-                </tr>
-            """
-        
-        html += """
-                </tbody>
-            </table>
-        </div>
-        <div class="table-info">
-            <span id="discovery-count">Showing {total} results</span>
-        </div>
-        """.format(total=len(discovery_results))
-        
-        return html
-    
-    def _create_score_gaps_table(self, score_gaps: List[Dict]) -> str:
-        """Create score gaps analysis table."""
-        html = f"""
-        <div class="table-controls">
-            <div class="search-box">
-                <input type="text" id="gaps-search" placeholder="Search score gaps..." 
-                    onkeyup="filterGapsTable()" class="search-input">
-                <span class="search-icon">🔍</span>
-            </div>
-            <div class="filter-controls">
-                <button onclick="exportGapsTable()" class="export-btn">📊 Export CSV</button>
-            </div>
-        </div>
-        
-        <div class="table-wrapper">
-            <table id="gaps-table" class="sortable-table">
-                <thead>
-                    <tr>
-                        <th onclick="sortGapsTable(0)" class="sortable">Req ID <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortGapsTable(1)" class="sortable">Requirement Name <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortGapsTable(2)" class="sortable">Best Algorithm Activity <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortGapsTable(3)" class="sortable">Algorithm Score <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortGapsTable(4)" class="sortable">Manual Score <span class="sort-arrow">↕</span></th>
-                        <th onclick="sortGapsTable(5)" class="sortable">Gap <span class="sort-arrow">↕</span></th>
-                    </tr>
-                </thead>
-                <tbody>
-        """
-        
-        for item in score_gaps:
-            req_name_display = item.get('requirement_name', 'N/A')[:50] + "..." if len(item.get('requirement_name', '')) > 50 else item.get('requirement_name', 'N/A')
-            activity_display = item['max_miss_activity'][:80] + "..." if len(item['max_miss_activity']) > 80 else item['max_miss_activity']
-            
-            gap = item['gap']
-            gap_class = "high-score" if gap > 0.5 else "medium-score" if gap > 0.2 else ""
-            
-            html += f"""
-                <tr class="data-row" 
-                    data-req-id="{item['requirement_id']}" 
-                    data-gap="{gap}"
-                    onclick="showRowDetails(this, 'gaps')">
-                    <td class="req-id">{item['requirement_id']}</td>
-                    <td class="req-name" title="{item.get('requirement_name', 'N/A')}">{req_name_display}</td>
-                    <td class="activity-name" title="{item['max_miss_activity']}">{activity_display}</td>
-                    <td class="score-cell"><strong>{item['max_miss_score']:.3f}</strong></td>
-                    <td class="score-cell">{item['min_manual_score']:.3f}</td>
-                    <td class="score-cell {gap_class}"><strong>+{gap:.3f}</strong></td>
-                </tr>
-            """
-        
-        html += """
-                </tbody>
-            </table>
-        </div>
-        <div class="table-info">
-            <span id="gaps-count">Showing {total} results</span>
-        </div>
-        """.format(total=len(score_gaps))
-        
-        return html
     def _create_quality_analysis_table(self, quality_data: Dict) -> str:
         """Create quality analysis summary table."""
         html = """
