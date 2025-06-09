@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Requirements Traceability Analysis - Technical Overview</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 2.2rem;
+            font-weight: 400;
+        }
+
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .nav {
+            background: #f8f9fa;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #dee2e6;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .nav button {
+            background: none;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            cursor: pointer;
+            border-radius: 4px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .nav button:hover {
+            background: #e9ecef;
+        }
+
+        .nav button.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .content {
+            padding: 2rem;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 6px;
+            text-align: center;
+            border-left: 4px solid #007bff;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            color: #2c3e50;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .algorithm-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .algorithm-card {
+            background: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+
+        .algorithm-card.semantic { border-left-color: #28a745; }
+        .algorithm-card.bm25 { border-left-color: #007bff; }
+        .algorithm-card.syntactic { border-left-color: #6f42c1; }
+        .algorithm-card.domain { border-left-color: #fd7e14; }
+        .algorithm-card.query { border-left-color: #e83e8c; }
+
+        .algorithm-card h4 {
+            margin: 0 0 1rem 0;
+            color: #2c3e50;
+            font-size: 1.1rem;
+        }
+
+        .algorithm-card p {
+            margin: 0;
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .data-table th {
+            background: #343a40;
+            color: white;
+            padding: 1rem 0.75rem;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .data-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #e9ecef;
+            font-size: 0.85rem;
+            vertical-align: top;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .score-cell {
+            text-align: center;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            padding: 0.5rem;
+            border-radius: 3px;
+        }
+
+        .high-score { background: #d4edda; color: #155724; }
+        .medium-score { background: #fff3cd; color: #856404; }
+        .low-score { background: #f8d7da; color: #721c24; }
+
+        .quality-excellent { background: #d4edda; color: #155724; font-weight: bold; text-align: center; padding: 0.4rem; border-radius: 3px; }
+        .quality-good { background: #d1ecf1; color: #0c5460; font-weight: bold; text-align: center; padding: 0.4rem; border-radius: 3px; }
+        .quality-fair { background: #fff3cd; color: #856404; font-weight: bold; text-align: center; padding: 0.4rem; border-radius: 3px; }
+        .quality-poor { background: #f8d7da; color: #721c24; font-weight: bold; text-align: center; padding: 0.4rem; border-radius: 3px; }
+        .quality-critical { background: #f5c6cb; color: #721c24; font-weight: bold; text-align: center; padding: 0.4rem; border-radius: 3px; }
+
+        .text-cell {
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .text-cell:hover {
+            white-space: normal;
+            word-wrap: break-word;
+            background: #e3f2fd;
+            cursor: pointer;
+        }
+
+        .export-buttons {
+            margin: 1rem 0;
+            text-align: right;
+        }
+
+        .export-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            margin: 0 0.5rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: background 0.2s ease;
+        }
+
+        .export-btn:hover {
+            background: #5a6268;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 1rem;
+            margin: 1rem 0;
+            border-radius: 4px;
+        }
+
+        .columns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .column-group {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 3px solid #6c757d;
+        }
+
+        .column-group h5 {
+            margin: 0 0 0.5rem 0;
+            color: #2c3e50;
+            font-size: 0.9rem;
+        }
+
+        .column-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .column-list li {
+            padding: 0.2rem 0;
+        }
+
+        .explanation-example {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-left: 4px solid #28a745;
+        }
+
+        .explanation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .match-score {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #28a745;
+            font-family: 'Courier New', monospace;
+        }
+
+        .component-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .component {
+            background: white;
+            padding: 1rem;
+            border-radius: 4px;
+            border-left: 3px solid;
+        }
+
+        .component.semantic { border-left-color: #28a745; }
+        .component.bm25 { border-left-color: #007bff; }
+        .component.syntactic { border-left-color: #6f42c1; }
+        .component.domain { border-left-color: #fd7e14; }
+        .component.query { border-left-color: #e83e8c; }
+
+        .component-name {
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+            color: #2c3e50;
+        }
+
+        .component-score {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .component-detail {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .nav {
+                flex-direction: column;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .algorithm-grid,
+            .columns-grid,
+            .component-breakdown {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Requirements Traceability Analysis</h1>
+            <p>Algorithm Implementation & Data Structure</p>
+        </div>
+
+        <div class="nav">
+            <button class="active" onclick="showSection('overview')">System Overview</button>
+            <button onclick="showSection('algorithms')">Matching Algorithms</button>
+            <button onclick="showSection('dataframe')">DataFrame Structure</button>
+            <button onclick="showSection('quality')">Quality Analysis</button>
+            <button onclick="showSection('explanations')">Explainability</button>
+            <button onclick="showSection('outputs')">Output Files</button>
+        </div>
+
+        <div class="content">
+            <!-- System Overview -->
+            <div id="overview" class="section active">
+                <h2>System Overview</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-value">N×K</div>
+                        <div class="stat-label">Predictions Generated</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">5</div>
+                        <div class="stat-label">Similarity Algorithms</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">23+</div>
+                        <div class="stat-label">DataFrame Columns</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">4</div>
+                        <div class="stat-label">Output Formats</div>
+                    </div>
+                </div>
+
+                <div class="info-box">
+                    <p><strong>System Architecture:</strong> Multi-algorithm matching system with comprehensive quality analysis. Processes N requirements against M activities, generating top-K matches per requirement filtered by similarity threshold (default: 0.35). Each prediction includes detailed scoring, quality metrics, and explanations.</p>
+                </div>
+
+                <h3>Processing Pipeline</h3>
+                <div class="code-block">
+1. Load requirements.csv and activities.csv
+2. Extract domain-specific terms from corpus
+3. Compute corpus statistics (TF-IDF, document frequencies)
+4. Process documents with spaCy NLP pipeline
+5. For each requirement-activity pair:
+   - Calculate semantic similarity (transformer embeddings)
+   - Calculate BM25 score (term matching with TF-IDF)
+   - Calculate syntactic similarity (dependency patterns)
+   - Calculate domain similarity (technical term overlap)
+   - Calculate query expansion similarity (synonym matching)
+6. Combine scores using weighted formula
+7. Filter by minimum similarity threshold
+8. Keep top-K matches per requirement
+9. Run quality analysis on requirements
+10. Generate explanations for each match decision
+                </div>
+
+                <h3>Default Configuration</h3>
+                <div class="code-block">
+weights = {
+    'dense_semantic': 0.4,      # Transformer-based similarity
+    'bm25': 0.2,                # Term-based relevance
+    'syntactic': 0.2,           # Grammatical structure
+    'domain_weighted': 0.1,     # Technical domain terms
+    'query_expansion': 0.1      # Synonym expansion
+}
+
+min_similarity = 0.35           # Minimum threshold for inclusion
+top_k = 5                      # Maximum matches per requirement
+spacy_model = "en_core_web_trf" # Transformer model for embeddings
+                </div>
+            </div>
+
+            <!-- Matching Algorithms -->
+            <div id="algorithms" class="section">
+                <h2>Matching Algorithms</h2>
+
+                <div class="algorithm-grid">
+                    <div class="algorithm-card semantic">
+                        <h4>1. Semantic Similarity</h4>
+                        <p><strong>Method:</strong> Transformer embeddings via spaCy en_core_web_trf</p>
+                        <p><strong>Implementation:</strong> Cosine similarity between mean-pooled last hidden layer states</p>
+                        <p><strong>Fallback:</strong> Standard spaCy similarity if transformer data unavailable</p>
+                        <p><strong>Weight:</strong> 40% (primary component)</p>
+                    </div>
+
+                    <div class="algorithm-card bm25">
+                        <h4>2. BM25 Scoring</h4>
+                        <p><strong>Method:</strong> Best Matching 25 algorithm with TF-IDF</p>
+                        <p><strong>Parameters:</strong> k1=1.5, b=0.75</p>
+                        <p><strong>Features:</strong> Lemmatized terms, stop word removal, corpus statistics</p>
+                        <p><strong>Weight:</strong> 20%</p>
+                    </div>
+
+                    <div class="algorithm-card syntactic">
+                        <h4>3. Syntactic Analysis</h4>
+                        <p><strong>Method:</strong> Dependency pattern matching + POS sequence analysis</p>
+                        <p><strong>Features:</strong> Verb frames, entity types, grammatical structures</p>
+                        <p><strong>Similarity:</strong> Jaccard index on syntactic feature sets</p>
+                        <p><strong>Weight:</strong> 20%</p>
+                    </div>
+
+                    <div class="algorithm-card domain">
+                        <h4>4. Domain Knowledge</h4>
+                        <p><strong>Method:</strong> Auto-extracted technical terms with frequency weighting</p>
+                        <p><strong>Detection:</strong> Term length, capitalization, numbers, multi-word phrases</p>
+                        <p><strong>Scoring:</strong> Shared domain terms weighted by corpus rarity</p>
+                        <p><strong>Weight:</strong> 10%</p>
+                    </div>
+
+                    <div class="algorithm-card query">
+                        <h4>5. Query Expansion</h4>
+                        <p><strong>Method:</strong> Synonym dictionary lookup for key terms</p>
+                        <p><strong>Dictionary:</strong> Domain-specific synonyms from synonyms.json</p>
+                        <p><strong>Matching:</strong> Expanded terms against activity text</p>
+                        <p><strong>Weight:</strong> 10%</p>
+                    </div>
+                </div>
+
+                <h3>Combined Scoring Formula</h3>
+                <div class="code-block">
+combined_score = (
+    semantic_score * 0.4 +
+    bm25_score * 0.2 +
+    syntactic_score * 0.2 +
+    domain_score * 0.1 +
+    query_expansion_score * 0.1
+)
+                </div>
+            </div>
+
+            <!-- DataFrame Structure -->
+            <div id="dataframe" class="section">
+                <h2>DataFrame Structure</h2>
+
+                <div class="export-buttons">
+                    <button class="export-btn" onclick="exportTable('dataframe-table')">Export Sample</button>
+                </div>
+
+                <table class="data-table" id="dataframe-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Requirement Name</th>
+                            <th>Activity Name</th>
+                            <th>Combined Score</th>
+                            <th>Dense Semantic</th>
+                            <th>BM25 Score</th>
+                            <th>Syntactic Score</th>
+                            <th>Domain Weighted</th>
+                            <th>Query Expansion</th>
+                            <th>Quality Score</th>
+                            <th>Quality Grade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr onclick="highlightRow(this)">
+                            <td><strong>REQ_001</strong></td>
+                            <td class="text-cell">System shall authenticate users with MFA</td>
+                            <td class="text-cell">User Login Authentication Module</td>
+                            <td class="score-cell high-score">1.247</td>
+                            <td class="score-cell">0.892</td>
+                            <td class="score-cell">0.634</td>
+                            <td class="score-cell">0.456</td>
+                            <td class="score-cell">0.723</td>
+                            <td class="score-cell">0.412</td>
+                            <td class="score-cell">87.3</td>
+                            <td class="quality-excellent">EXCELLENT</td>
+                        </tr>
+                        <tr onclick="highlightRow(this)">
+                            <td><strong>REQ_002</strong></td>
+                            <td class="text-cell">Database shall store encrypted credentials</td>
+                            <td class="text-cell">Credential Database Management</td>
+                            <td class="score-cell high-score">1.156</td>
+                            <td class="score-cell">0.834</td>
+                            <td class="score-cell">0.578</td>
+                            <td class="score-cell">0.389</td>
+                            <td class="score-cell">0.691</td>
+                            <td class="score-cell">0.334</td>
+                            <td class="score-cell">76.8</td>
+                            <td class="quality-good">GOOD</td>
+                        </tr>
+                        <tr onclick="highlightRow(this)">
+                            <td><strong>REQ_003</strong></td>
+                            <td class="text-cell">System should have good performance</td>
+                            <td class="text-cell">Performance Monitoring Service</td>
+                            <td class="score-cell medium-score">0.789</td>
+                            <td class="score-cell">0.567</td>
+                            <td class="score-cell">0.445</td>
+                            <td class="score-cell">0.334</td>
+                            <td class="score-cell">0.498</td>
+                            <td class="score-cell">0.289</td>
+                            <td class="score-cell">58.4</td>
+                            <td class="quality-fair">FAIR</td>
+                        </tr>
+                        <tr onclick="highlightRow(this)">
+                            <td><strong>REQ_004</strong></td>
+                            <td class="text-cell">Error handling mechanisms needed</td>
+                            <td class="text-cell">Exception Management Framework</td>
+                            <td class="score-cell medium-score">0.654</td>
+                            <td class="score-cell">0.445</td>
+                            <td class="score-cell">0.389</td>
+                            <td class="score-cell">0.267</td>
+                            <td class="score-cell">0.412</td>
+                            <td class="score-cell">0.198</td>
+                            <td class="score-cell">69.1</td>
+                            <td class="quality-good">GOOD</td>
+                        </tr>
+                        <tr onclick="highlightRow(this)">
+                            <td><strong>REQ_005</strong></td>
+                            <td class="text-cell">Something about backup stuff</td>
+                            <td class="text-cell">Backup Management System</td>
+                            <td class="score-cell low-score">0.423</td>
+                            <td class="score-cell">0.334</td>
+                            <td class="score-cell">0.267</td>
+                            <td class="score-cell">0.189</td>
+                            <td class="score-cell">0.298</td>
+                            <td class="score-cell">0.156</td>
+                            <td class="score-cell">34.2</td>
+                            <td class="quality-critical">CRITICAL</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Complete Column Structure</h3>
+                <div class="columns-grid">
+                    <div class="column-group">
+                        <h5>Core Data</h5>
+                        <ul class="column-list">
+                            <li>ID</li>
+                            <li>Requirement Name</li>
+                            <li>Requirement Text</li>
+                            <li>Activity Name</li>
+                        </ul>
+                    </div>
+                    <div class="column-group">
+                        <h5>Similarity Scores</h5>
+                        <ul class="column-list">
+                            <li>Combined Score</li>
+                            <li>Dense Semantic</li>
+                            <li>BM25 Score</li>
+                            <li>Syntactic Score</li>
+                            <li>Domain Weighted</li>
+                            <li>Query Expansion</li>
+                        </ul>
+                    </div>
+                    <div class="column-group">
+                        <h5>Quality Metrics</h5>
+                        <ul class="column-list">
+                            <li>Quality Score</li>
+                            <li>Quality Grade</li>
+                            <li>Clarity Score</li>
+                            <li>Completeness Score</li>
+                            <li>Verifiability Score</li>
+                            <li>Atomicity Score</li>
+                            <li>Consistency Score</li>
+                        </ul>
+                    </div>
+                    <div class="column-group">
+                        <h5>Issue Analysis</h5>
+                        <ul class="column-list">
+                            <li>Issues</li>
+                            <li>Total Issues</li>
+                            <li>Critical Issues</li>
+                            <li>High Issues</li>
+                            <li>Medium Issues</li>
+                            <li>Low Issues</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quality Analysis -->
+            <div id="quality" class="section">
+                <h2>Quality Analysis Implementation</h2>
+
+                <div class="info-box">
+                    <p><strong>Quality Framework:</strong> Automated analysis using spaCy NLP to assess requirement quality across 5 dimensions. Each requirement receives individual scoring and specific improvement recommendations.</p>
+                </div>
+
+                <div class="algorithm-grid">
+                    <div class="algorithm-card">
+                        <h4>Clarity Analysis</h4>
+                        <p><strong>Detection:</strong> Ambiguous terms, passive voice constructions</p>
+                        <p><strong>Examples:</strong> "appropriate", "sufficient", "good", passive verb forms</p>
+                        <p><strong>Weight:</strong> 25% of overall quality score</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>Completeness Analysis</h4>
+                        <p><strong>Detection:</strong> Missing subject, verb, object; no modal verbs</p>
+                        <p><strong>Examples:</strong> Requirements without "shall/should/may"</p>
+                        <p><strong>Weight:</strong> 25% of overall quality score</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>Verifiability Analysis</h4>
+                        <p><strong>Detection:</strong> Measurable criteria, quantifiable terms</p>
+                        <p><strong>Examples:</strong> Numbers, percentages, time units, entity recognition</p>
+                        <p><strong>Weight:</strong> 20% of overall quality score</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>Atomicity Analysis</h4>
+                        <p><strong>Detection:</strong> Compound requirements, multiple conjunctions</p>
+                        <p><strong>Examples:</strong> Requirements with "and", "or" suggesting multiple needs</p>
+                        <p><strong>Weight:</strong> 20% of overall quality score</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>Consistency Analysis</h4>
+                        <p><strong>Detection:</strong> Modal verb usage indicating requirement strength</p>
+                        <p><strong>Categories:</strong> Mandatory (shall/must), Recommended (should), Optional (may)</p>
+                        <p><strong>Weight:</strong> 10% of overall quality score</p>
+                    </div>
+                </div>
+
+                <h3>Quality Grading</h3>
+                <div class="code-block">
+def assign_grade(overall_score):
+    if overall_score >= 80:
+        return "EXCELLENT"  # Production ready
+    elif overall_score >= 65:
+        return "GOOD"       # Minor improvements needed
+    elif overall_score >= 50:
+        return "FAIR"       # Moderate revision required
+    elif overall_score >= 35:
+        return "POOR"       # Significant rewrite needed
+    else:
+        return "CRITICAL"   # Complete rewrite required
+                </div>
+
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Quality Dimension</th>
+                            <th>Score Range</th>
+                            <th>Common Issues Detected</th>
+                            <th>Example Recommendations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Clarity</strong></td>
+                            <td>0-100</td>
+                            <td>Ambiguous terms, passive voice</td>
+                            <td>Replace "appropriate" with specific criteria</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Completeness</strong></td>
+                            <td>0-100</td>
+                            <td>Missing modal verbs, incomplete structure</td>
+                            <td>Add "shall" to indicate requirement strength</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Verifiability</strong></td>
+                            <td>0-100</td>
+                            <td>No measurable criteria</td>
+                            <td>Add specific performance targets or thresholds</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Atomicity</strong></td>
+                            <td>0-100</td>
+                            <td>Compound requirements</td>
+                            <td>Split into separate requirement statements</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Consistency</strong></td>
+                            <td>0-100</td>
+                            <td>Missing or inconsistent modal verbs</td>
+                            <td>Use consistent modal verb patterns</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Explainability -->
+            <div id="explanations" class="section">
+                <h2>Explainability Implementation</h2>
+
+                <div class="info-box">
+                    <p><strong>Explanation System:</strong> Every match decision generates detailed reasoning saved to JSON. Includes component score breakdowns, shared term analysis, and algorithmic decision rationale.</p>
+                </div>
+
+                <div class="explanation-example">
+                    <div class="explanation-header">
+                        <div>
+                            <h4>Example: REQ_001 → Authentication Module</h4>
+                            <p>Requirement: "System shall authenticate users with MFA"</p>
+                            <p>Activity: "User Login Authentication Module with MFA Support"</p>
+                        </div>
+                        <div class="match-score">1.247</div>
+                    </div>
+
+                    <div class="component-breakdown">
+                        <div class="component semantic">
+                            <div class="component-name">Semantic</div>
+                            <div class="component-score">0.892</div>
+                            <div class="component-detail">Very High semantic similarity via transformer embeddings</div>
+                        </div>
+                        <div class="component bm25">
+                            <div class="component-name">BM25</div>
+                            <div class="component-score">0.634</div>
+                            <div class="component-detail">Matched 4 terms: authentication(2.34), user(1.67), login(1.23), system(0.89)</div>
+                        </div>
+                        <div class="component syntactic">
+                            <div class="component-name">Syntactic</div>
+                            <div class="component-score">0.456</div>
+                            <div class="component-detail">dep_patterns: 6/8=0.75, pos_sequence: 3/6=0.50</div>
+                        </div>
+                        <div class="component domain">
+                            <div class="component-name">Domain</div>
+                            <div class="component-score">0.723</div>
+                            <div class="component-detail">Shared 3 domain terms: authentication(0.91), multi-factor(0.85)</div>
+                        </div>
+                        <div class="component query">
+                            <div class="component-name">Query Expansion</div>
+                            <div class="component-score">0.412</div>
+                            <div class="component-detail">3/5 expansion matches: authenticate→[verify, validate]</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h3>JSON Explanation Structure</h3>
+                <div class="code-block">
+{
+  "requirement_id": "REQ_001",
+  "requirement_text": "System shall authenticate users with MFA...",
+  "activity_name": "User Login Authentication Module with MFA Support",
+  "combined_score": 1.247,
+  "match_quality": "EXCELLENT",
+  "scores": {
+    "semantic": 0.892,
+    "bm25": 0.634,
+    "syntactic": 0.456,
+    "domain": 0.723,
+    "query_expansion": 0.412
+  },
+  "explanations": {
+    "semantic": "Very High semantic similarity (0.892) via transformer embeddings",
+    "bm25": "Matched 4 terms: 'authentication'(2.34); 'user'(1.67)...",
+    "syntactic": "dep_patterns: 6/8=0.75 (shared: [nsubj:VERB, dobj:NOUN])...",
+    "domain": "Shared 3 domain terms: 'authentication'(0.91)...",
+    "query_expansion": "3/5 expansion matches: [verify, validate]..."
+  },
+  "shared_terms": ["authentication", "user", "system", "multi-factor"],
+  "semantic_similarity_level": "Very High"
+}
+                </div>
+
+                <h3>Explanation Generation Process</h3>
+                <div class="code-block">
+1. For each match above threshold:
+   a. Calculate component scores
+   b. Generate component-specific explanations
+   c. Extract shared terms
+   d. Determine semantic similarity level
+   e. Assign overall match quality grade
+   f. Create MatchExplanation object
+2. Serialize all explanations to JSON
+3. Save as {output_file}_explanations.json
+                </div>
+            </div>
+
+            <!-- Output Files -->
+            <div id="outputs" class="section">
+                <h2>Output Files</h2>
+
+                <div class="algorithm-grid">
+                    <div class="algorithm-card">
+                        <h4>final_clean_matches.csv</h4>
+                        <p><strong>Content:</strong> All predictions with similarity scores</p>
+                        <p><strong>Size:</strong> N×K rows (N requirements × K matches each)</p>
+                        <p><strong>Columns:</strong> 10 core prediction columns</p>
+                        <p><strong>Usage:</strong> Primary analysis dataset</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>enhanced_predictions.csv</h4>
+                        <p><strong>Content:</strong> Predictions + quality analysis</p>
+                        <p><strong>Size:</strong> Same as matches but with 13+ additional quality columns</p>
+                        <p><strong>Columns:</strong> 23+ total columns</p>
+                        <p><strong>Usage:</strong> Complete analysis with quality intelligence</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>final_clean_matches_explanations.json</h4>
+                        <p><strong>Content:</strong> Detailed reasoning for each match</p>
+                        <p><strong>Structure:</strong> Array of explanation objects</p>
+                        <p><strong>Size:</strong> One explanation per prediction</p>
+                        <p><strong>Usage:</strong> Algorithm debugging and transparency</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>requirements_quality_report.xlsx</h4>
+                        <p><strong>Content:</strong> Multi-tab quality dashboard</p>
+                        <p><strong>Tabs:</strong> Dashboard, Critical Issues, Recommendations, Detailed Results</p>
+                        <p><strong>Format:</strong> Executive-ready Excel report</p>
+                        <p><strong>Usage:</strong> Management reporting and quality improvement</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>unified_evaluation_dashboard.html</h4>
+                        <p><strong>Content:</strong> Interactive web interface</p>
+                        <p><strong>Features:</strong> Search, filter, sort, detailed modals</p>
+                        <p><strong>Data:</strong> All predictions with quality and discovery analysis</p>
+                        <p><strong>Usage:</strong> Interactive exploration and presentation</p>
+                    </div>
+
+                    <div class="algorithm-card">
+                        <h4>evaluation_summary.json</h4>
+                        <p><strong>Content:</strong> Performance metrics (if ground truth available)</p>
+                        <p><strong>Metrics:</strong> Precision@K, Recall@K, F1@K, MRR, NDCG</p>
+                        <p><strong>Analysis:</strong> Discovery insights and score gap analysis</p>
+                        <p><strong>Usage:</strong> Algorithm validation and improvement</p>
+                    </div>
+                </div>
+
+                <h3>File Generation Workflow</h3>
+                <div class="code-block">
+1. Matcher generates predictions → final_clean_matches.csv + explanations.json
+2. Evaluator adds quality analysis → enhanced_predictions.csv  
+3. Quality analyzer creates Excel report → requirements_quality_report.xlsx
+4. Dashboard generator creates web interface → unified_evaluation_dashboard.html
+5. If ground truth provided → evaluation_summary.json with performance metrics
+                </div>
+
+                <h3>Output Directory Structure</h3>
+                <div class="code-block">
+outputs/
+├── matching_results/
+│   ├── final_clean_matches.csv
+│   └── final_clean_matches_explanations.json
+├── evaluation_results/
+│   ├── enhanced_predictions.csv
+│   ├── evaluation_summary.json
+│   └── dashboards/
+│       └── unified_evaluation_dashboard.html
+└── quality_analysis/
+    ├── requirements_quality_report.csv
+    └── requirements_quality_report.xlsx
+                </div>
+
+                <div class="info-box">
+                    <p><strong>Data Consistency:</strong> All output files maintain referential integrity through requirement IDs and activity names. CSV files use consistent column naming. JSON explanations reference the same requirement-activity pairs as the main predictions.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.querySelectorAll('.nav button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(sectionId).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function highlightRow(row) {
+            document.querySelectorAll('.data-table tr').forEach(r => {
+                r.style.backgroundColor = '';
+            });
+            row.style.backgroundColor = '#e3f2fd';
+        }
+
+        function exportTable(tableId) {
+            const table = document.getElementById(tableId);
+            let csv = '';
+            
+            const headers = table.querySelectorAll('thead th');
+            const headerRow = Array.from(headers).map(th => th.textContent.trim()).join(',');
+            csv += headerRow + '\n';
+            
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const rowData = Array.from(cells).map(td => {
+                    let text = td.textContent.trim();
+                    if (text.includes(',')) {
+                        text = `"${text}"`;
+                    }
+                    return text;
+                }).join(',');
+                csv += rowData + '\n';
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sample_dataframe.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Downloaded';
+            setTimeout(() => {
+                btn.textContent = originalText;
+            }, 2000);
+        }
+
+        // Add keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                const sections = ['overview', 'algorithms', 'dataframe', 'quality', 'explanations', 'outputs'];
+                const currentSection = document.querySelector('.section.active').id;
+                const currentIndex = sections.indexOf(currentSection.replace('-section', ''));
+                
+                let nextIndex;
+                if (e.key === 'ArrowRight') {
+                    nextIndex = (currentIndex + 1) % sections.length;
+                } else {
+                    nextIndex = (currentIndex - 1 + sections.length) % sections.length;
+                }
+                
+                const nextSectionId = sections[nextIndex];
+                const navButton = document.querySelector(`[onclick="showSection('${nextSectionId}')"]`);
+                if (navButton) {
+                    navButton.click();
+                }
+            }
+        });
+
+        // Add smooth transitions
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = document.querySelectorAll('.section');
+            sections.forEach(section => {
+                section.style.transition = 'opacity 0.3s ease';
+            });
+        });
+    </script>
+</body>
+</html>
