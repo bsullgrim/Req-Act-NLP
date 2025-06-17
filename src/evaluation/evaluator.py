@@ -21,7 +21,7 @@ from collections import defaultdict, Counter
 import chardet
 
 # Import components
-from src.quality.reqGrading import RequirementAnalyzer, QualityMetrics
+from ..quality import RequirementAnalyzer, QualityMetrics
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

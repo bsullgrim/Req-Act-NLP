@@ -53,7 +53,7 @@ class TableGenerator:
         return html.escape(str(text), quote=True)
     
     def _create_predictions_table(self, predictions_data: List[Dict]) -> str:
-        """Create predictions table with PROPER click handlers."""
+        """Create simplified predictions table without complex click handlers."""
         
         print(f"🔧 Creating predictions table with {len(predictions_data)} predictions")
         
@@ -61,7 +61,7 @@ class TableGenerator:
         <div class="table-controls">
             <div class="search-box">
                 <input type="text" id="predictions-search" placeholder="Search requirements, activities..." 
-                       onkeyup="searchPredictionsTable()" class="search-input">
+                    onkeyup="searchPredictionsTable()" class="search-input">
                 <span class="search-icon">🔍</span>
             </div>
             <div class="filter-controls">
@@ -85,34 +85,19 @@ class TableGenerator:
                 <tbody>
         """
         
-        # Generate table rows with PROPER escaping and click handlers
+        # Generate table rows with simplified data attributes
         for item in predictions_data:
-            # Truncate for display
             req_name_display = item['requirement_name'][:50] + "..." if len(item['requirement_name']) > 50 else item['requirement_name']
             activity_display = item['activity_name'][:80] + "..." if len(item['activity_name']) > 80 else item['activity_name']
             
-            # Escape data for HTML attributes - CRITICAL FIX
-            req_text_escaped = self._escape_for_html_attr(item['requirement_text'])
-            req_name_escaped = self._escape_for_html_attr(item['requirement_name'])
-            activity_escaped = self._escape_for_html_attr(item['activity_name'])
-            req_id_escaped = self._escape_for_html_attr(item['requirement_id'])
-            
-            # Escape for display in title attributes
-            req_name_title = self._escape_for_html_attr(item['requirement_name'])
-            activity_title = self._escape_for_html_attr(item['activity_name'])
-            
             html_content += f"""
                 <tr class="data-row {item['score_class']}" 
-                    data-req-id="{req_id_escaped}" 
+                    data-req-id="{item['requirement_id']}" 
                     data-combined-score="{item['combined_score']}"
-                    data-req-name-full="{req_name_escaped}"
-                    data-activity-full="{activity_escaped}"
-                    data-req-text="{req_text_escaped}"
-                    onclick="showRowDetails(this, 'predictions')"
-                    style="cursor: pointer;">
+                    title="Click for details, Export for full data">
                     <td class="req-id">{item['requirement_id']}</td>
-                    <td class="req-name" title="{req_name_title}">{req_name_display}</td>
-                    <td class="activity-name" title="{activity_title}">{activity_display}</td>
+                    <td class="req-name" title="{item['requirement_name']}">{req_name_display}</td>
+                    <td class="activity-name" title="{item['activity_name']}">{activity_display}</td>
                     <td class="score-cell"><strong>{item['combined_score']:.3f}</strong></td>
                     <td class="score-cell">{item['semantic_score']:.3f}</td>
                     <td class="score-cell">{item['bm25_score']:.3f}</td>
@@ -128,7 +113,6 @@ class TableGenerator:
         </div>
         """
         
-        print(f"✅ Generated HTML for {len(predictions_data)} prediction rows with click handlers")
         return html_content
     
     def _create_discovery_results_table(self, discovery_results: List[Dict]) -> str:

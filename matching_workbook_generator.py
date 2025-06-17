@@ -321,7 +321,8 @@ class MatchingWorkbookGenerator:
 
 def create_matching_workbook(enhanced_df: pd.DataFrame, 
                            evaluation_results: Optional[Dict] = None,
-                           output_path: str = "outputs/engineering_review/matching_workbook.xlsx") -> str:
+                           output_path: str = "outputs/engineering_review/matching_workbook.xlsx",
+                           repo_manager=None) -> str:  # Add repo_manager parameter
     """
     Convenience function to create matching workbook.
     
@@ -329,9 +330,10 @@ def create_matching_workbook(enhanced_df: pd.DataFrame,
         enhanced_df: Enhanced predictions DataFrame
         evaluation_results: Optional evaluation results with discovery analysis
         output_path: Where to save the workbook
+        repo_manager: Repository manager instance
         
     Returns:
         Path to created workbook
     """
-    generator = MatchingWorkbookGenerator()
-    return generator.create_workbook(enhanced_df, evaluation_results, output_path)
+    generator = MatchingWorkbookGenerator(repo_manager)
+    return generator.create_workbook(enhanced_df, evaluation_results, output_path, repo_manager)
