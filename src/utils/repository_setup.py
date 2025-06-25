@@ -1,6 +1,7 @@
 """
 Repository Structure Manager - Handle repository setup and file organization
 Creates and maintains the standard repository directory structure
+FIXED: Added missing get_results_path() method
 """
 
 import shutil
@@ -21,15 +22,11 @@ class RepositoryStructureManager:
         self.structure = {
             # Data directories
             'data_raw': Path("data/raw"),
-            #'data_processed': Path("data/processed"), 
-            #'data_examples': Path("data/examples"),
             
             # Output directories
             'matching_results': self.base_dir / "matching_results",
             'evaluation_results': self.base_dir / "evaluation_results", 
             'evaluation_dashboards': self.base_dir / "evaluation_results" / "dashboards",
-            #'evaluation_detailed': self.base_dir / "evaluation_results" / "detailed_results",
-            #'evaluation_discovery': self.base_dir / "evaluation_results" / "discovery_analysis",
             'engineering_review': self.base_dir / "engineering_review",
             'quality_analysis': self.base_dir / "quality_analysis",
             
@@ -39,120 +36,119 @@ class RepositoryStructureManager:
             'src_dashboard': Path("src/dashboard"),
             'src_quality': Path("src/quality"),
             'src_utils': Path("src/utils"),
-            
-            # Configuration directories
-            #'configs': Path("configs"),
-            #'configs_matching': Path("configs/matching_configs"),
-            #'configs_evaluation': Path("configs/evaluation_configs"),
-            
-            # Other directories
-            #'scripts': Path("scripts"),
-            #'docs': Path("docs"),
-            #'tests': Path("tests"),
-            #'notebooks': Path("notebooks")
         }
 
     def setup_repository_structure(self, create_gitignore: bool = True) -> Dict[str, str]:
         """Create complete repository directory structure."""
         
-        logger.info("🏗️ Setting up repository structure...")
-        
-        created_dirs = {}
-        created_count = 0
+        created_dirs = []
         
         for name, path in self.structure.items():
-            if not path.exists():
+            try:
                 path.mkdir(parents=True, exist_ok=True)
-                created_dirs[name] = str(path)
-                created_count += 1
-                logger.debug(f"Created directory: {path}")
+                created_dirs.append(str(path))
+                logger.debug(f"✓ Created/verified directory: {path}")
+            except Exception as e:
+                logger.warning(f"Could not create directory {path}: {e}")
         
-        logger.info(f"✓ Repository structure created ({created_count} new directories)")
-        
-        # Create .gitignore for outputs
         if create_gitignore:
             self._create_gitignore()
         
-        return created_dirs
-
+        logger.info(f"✓ Repository structure setup complete ({len(created_dirs)} directories)")
+        return {name: str(path) for name, path in self.structure.items()}
+    
     def _create_gitignore(self):
-        """Create .gitignore file for the repository."""
+        """Create .gitignore for output directories."""
         
         gitignore_path = Path(".gitignore")
-        gitignore_content = f"""
-# Generated outputs directory
-{self.base_dir}/
-
-# Python
-*.pyc
-__pycache__/
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-*.egg-info/
-.pytest_cache/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-# Temporary files
-*.tmp
-*.temp
-
-# Data files (uncomment if you want to ignore data)
-# data/raw/*.csv
-# data/raw/*.xlsx
-
-# Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-"""
         
-        if not gitignore_path.exists():
-            with open(gitignore_path, 'w') as f:
-                f.write(gitignore_content.strip())
-            logger.info("✓ Created .gitignore")
-        else:
-            logger.debug(".gitignore already exists")
-
-    def organize_outputs(self, files: Dict[str, str], cleanup_patterns: Optional[List[str]] = None) -> Dict[str, str]:
-        """Organize output files into proper repository locations."""
+        # Patterns to ignore
+        ignore_patterns = [
+            "# Matching outputs",
+            "outputs/",
+            "*.csv",
+            "*.json", 
+            "*.xlsx",
+            "*.html",
+            "# Python",
+            "__pycache__/",
+            "*.pyc",
+            ".env",
+            "# IDE",
+            ".vscode/",
+            ".idea/",
+            "# OS",
+            ".DS_Store",
+            "Thumbs.db"
+        ]
         
-        logger.info("📦 Organizing outputs into repository structure...")
+        try:
+            # Read existing .gitignore if it exists
+            existing_content = ""
+            if gitignore_path.exists():
+                existing_content = gitignore_path.read_text()
+            
+            # Add new patterns if not already present
+            new_patterns = []
+            for pattern in ignore_patterns:
+                if pattern not in existing_content:
+                    new_patterns.append(pattern)
+            
+            if new_patterns:
+                with open(gitignore_path, 'a') as f:
+                    if existing_content and not existing_content.endswith('\n'):
+                        f.write('\n')
+                    f.write('\n'.join(new_patterns) + '\n')
+                logger.debug("✓ Updated .gitignore")
+                
+        except Exception as e:
+            logger.warning(f"Could not create/update .gitignore: {e}")
+
+    # FIXED: Add the missing methods that the matcher expects
+    def get_results_path(self):
+        """Get matching results directory path - compatibility method."""
+        results_dir = self.structure.get('matching_results', self.base_dir / 'matching_results')
+        Path(results_dir).mkdir(parents=True, exist_ok=True)
+        return Path(results_dir)
+    
+    def get_evaluation_path(self):
+        """Get evaluation results directory path."""
+        eval_dir = self.structure.get('evaluation_results', self.base_dir / 'evaluation_results')
+        Path(eval_dir).mkdir(parents=True, exist_ok=True)
+        return Path(eval_dir)
+    
+    def get_engineering_path(self):
+        """Get engineering review directory path."""
+        eng_dir = self.structure.get('engineering_review', self.base_dir / 'engineering_review')
+        Path(eng_dir).mkdir(parents=True, exist_ok=True)
+        return Path(eng_dir)
+
+    def organize_files(self, file_mapping: Dict[str, str]) -> Dict[str, str]:
+        """Organize files into appropriate directories."""
         
         organized_files = {}
         
-        # Move files to appropriate locations
-        for file_key, file_path in files.items():
+        for file_key, file_path in file_mapping.items():
             if not Path(file_path).exists():
-                logger.warning(f"File not found for organization: {file_path}")
+                logger.warning(f"File not found: {file_path}")
                 continue
             
+            # Determine target directory
             target_dir = self._get_target_directory(file_key, file_path)
+            
             if target_dir:
                 organized_path = self._move_to_target(file_path, target_dir)
                 if organized_path:
                     organized_files[file_key] = organized_path
+                else:
+                    organized_files[file_key] = file_path  # Keep original if move failed
+            else:
+                organized_files[file_key] = file_path  # Keep original if no target
         
-        # Clean up stray files if patterns provided
-        if cleanup_patterns:
-            self.cleanup_stray_files(cleanup_patterns)
-        
-        logger.info(f"✓ Organized {len(organized_files)} files")
         return organized_files
 
     def _get_target_directory(self, file_key: str, file_path: str) -> Optional[Path]:
-        """Determine target directory based on file key and path."""
+        """Determine target directory for a file."""
         
         file_name = Path(file_path).name.lower()
         
@@ -160,12 +156,8 @@ Thumbs.db
         if 'dashboard' in file_key or file_name.endswith('.html'):
             return self.structure['evaluation_dashboards']
         
-        # Discovery analysis files
-        elif any(keyword in file_name for keyword in ['discovery', 'miss', 'gap']):
-            return self.structure['evaluation_discovery']
-        
         # Engineering review files
-        elif any(keyword in file_key for keyword in ['executive', 'action', 'summary']):
+        elif any(keyword in file_key for keyword in ['executive', 'action', 'summary', 'workbook']):
             return self.structure['engineering_review']
         
         # Quality analysis files
@@ -178,7 +170,7 @@ Thumbs.db
         
         # Enhanced/detailed evaluation results
         elif any(keyword in file_key for keyword in ['enhanced', 'detailed', 'evaluation']):
-            return self.structure['evaluation_detailed']
+            return self.structure['evaluation_results']
         
         # Default to evaluation results
         else:
@@ -297,15 +289,11 @@ Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ### Input Data
 - `data/raw/` - Original input files (requirements.csv, activities.csv, manual_matches.csv)
-- `data/processed/` - Cleaned and processed data files
-- `data/examples/` - Sample/example datasets
 
 ### Outputs
 - `{self.base_dir}/matching_results/` - Raw algorithm matching results
 - `{self.base_dir}/evaluation_results/` - Evaluation metrics and analysis
   - `dashboards/` - Interactive HTML dashboards
-  - `detailed_results/` - Detailed per-requirement analysis
-  - `discovery_analysis/` - Discovery insights and missed connections
 - `{self.base_dir}/engineering_review/` - Business deliverables
 - `{self.base_dir}/quality_analysis/` - Requirements quality analysis
 
@@ -315,20 +303,17 @@ Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 - `src/dashboard/` - Dashboard components
 - `src/utils/` - Shared utilities
 
-### Configuration
-- `configs/` - Configuration files for different runs
-
 ## Usage
 
-1. Place input files in `data/raw/`
-2. Run the workflow: `python workflow_orchestrator.py`
+1. Place input files in project root or `data/raw/`
+2. Run the matcher: `python -m src.matching.matcher`
 3. Check results in `{self.base_dir}/`
 
 ## Key Files
 
-- **Dashboard**: `{self.base_dir}/evaluation_results/dashboards/evaluation_dashboard.html`
-- **Executive Summary**: `{self.base_dir}/engineering_review/executive_summary.csv`
-- **All Matches**: `{self.base_dir}/matching_results/final_clean_matches.csv`
+- **All Matches**: `{self.base_dir}/matching_results/`
+- **Dashboards**: `{self.base_dir}/evaluation_results/dashboards/`
+- **Reports**: `{self.base_dir}/engineering_review/`
 """
         
         readme_path = Path("README.md")

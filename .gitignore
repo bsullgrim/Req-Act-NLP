@@ -5,3 +5,15 @@ __pycache__/
 .DS_Store
 *.log
 .pytest_cache/
+# Matching outputs
+*.csv
+*.json
+*.xlsx
+*.html
+# Python
+.env
+# IDE
+.vscode/
+.idea/
+# OS
+Thumbs.db

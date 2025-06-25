@@ -42,7 +42,7 @@ def run_evaluation_only_workflow(
     print(f"📂 Loading existing matches from: {matches_file}")
     try:
         matches_df = file_handler.safe_read_csv(matches_file)
-        print(f"✅ Loaded {len(matches_df)} matches for {matches_df['ID'].nunique()} requirements")
+        print(f"✅ Loaded {len(matches_df)} matches for {matches_df['Requirement_ID'].nunique()} requirements")
     except FileNotFoundError:
         print(f"❌ ERROR: Matches file not found: {matches_file}")
         print("   Run the matcher first to generate match results!")
@@ -122,7 +122,7 @@ def run_evaluation_only_workflow(
     
     # Quality summary
     if 'Quality_Grade' in enhanced_predictions.columns:
-        quality_dist = enhanced_predictions.groupby('ID').first()['Quality_Grade'].value_counts()
+        quality_dist = enhanced_predictions.groupby('Requirement_ID').first()['Quality_Grade'].value_counts()
         print(f"\n🎯 Quality Summary:")
         for grade, count in quality_dist.items():
             print(f"   {grade}: {count} requirements")

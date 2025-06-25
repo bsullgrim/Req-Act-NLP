@@ -22,7 +22,7 @@ Quality Dimensions Analyzed:
 
 # Import main classes (with fallback for standalone operation)
 try:
-    from .reqGrading import RequirementAnalyzer, QualityMetrics
+    from .reqGrading import EnhancedRequirementAnalyzer as RequirementAnalyzer, QualityMetrics
 except ImportError:
     # Fallback for standalone operation
     try:

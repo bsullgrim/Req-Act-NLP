@@ -139,9 +139,30 @@ class EnhancedMatchingEvaluator:
         
         # Get unique requirements for quality analysis
         unique_requirements = {}
-        req_text_col = 'Requirement Text' if 'Requirement Text' in enhanced_df.columns else 'requirement_text'
-        req_id_col = 'ID' if 'ID' in enhanced_df.columns else 'requirement_id'
-        
+        # Comprehensive column detection
+        possible_req_id_cols = ['ID', 'Requirement_ID', 'requirement_id', 'req_id']
+        possible_req_text_cols = ['Requirement Text', 'Requirement_Text', 'requirement_text', 'Text']
+
+        req_id_col = None
+        req_text_col = None
+
+        for col in possible_req_id_cols:
+            if col in enhanced_df.columns:
+                req_id_col = col
+                break
+
+        for col in possible_req_text_cols:
+            if col in enhanced_df.columns:
+                req_text_col = col
+                break
+
+        if req_id_col is None:
+            raise ValueError(f"Could not find requirement ID column. Available: {enhanced_df.columns.tolist()}")
+        if req_text_col is None:
+            raise ValueError(f"Could not find requirement text column. Available: {enhanced_df.columns.tolist()}")
+
+        print(f"🔍 Using columns: req_id='{req_id_col}', req_text='{req_text_col}'")
+        # Extract unique requirements from predictions    
         for _, row in enhanced_df.iterrows():
             req_id = str(row[req_id_col])
             req_text = str(row.get(req_text_col, ''))
@@ -275,10 +296,17 @@ class EnhancedMatchingEvaluator:
         
         # Group predictions by requirement
         req_predictions = defaultdict(list)
-        req_id_col = 'ID' if 'ID' in enhanced_df.columns else 'requirement_id'
-        activity_col = 'Activity Name' if 'Activity Name' in enhanced_df.columns else 'activity_name'
-        score_col = 'Combined Score' if 'Combined Score' in enhanced_df.columns else 'score'
-        
+        # Comprehensive column detection
+        possible_req_id_cols = ['ID', 'Requirement_ID', 'requirement_id']
+        possible_activity_cols = ['Activity Name', 'Activity_Name', 'activity_name']
+        possible_score_cols = ['Combined Score', 'Combined_Score', 'score']
+
+        req_id_col = next((col for col in possible_req_id_cols if col in enhanced_df.columns), None)
+        activity_col = next((col for col in possible_activity_cols if col in enhanced_df.columns), None)
+        score_col = next((col for col in possible_score_cols if col in enhanced_df.columns), None)
+
+        if not all([req_id_col, activity_col, score_col]):
+            raise ValueError(f"Missing columns. Found: req_id='{req_id_col}', activity='{activity_col}', score='{score_col}'. Available: {enhanced_df.columns.tolist()}")
         for _, row in enhanced_df.iterrows():
             req_id = str(row[req_id_col])
             activity = normalize_text(row[activity_col])
@@ -369,7 +397,7 @@ class EnhancedMatchingEvaluator:
                 for pred in predictions:
                     if pred['activity'] not in gt_activities and pred['score'] > 0.5:
                         high_scoring_misses.append({
-                            'requirement_id': req_id,
+                            'Requirement_ID': req_id,
                             'activity_name': pred['original_activity'],
                             'score': pred['score'],
                             'manual_matches_count': len(gt_activities),  # CORRECT: count of manual matches
@@ -392,7 +420,7 @@ class EnhancedMatchingEvaluator:
                                             if pred['activity'] not in gt_activities and pred['score'] == max_miss_score)
                         
                         score_gaps.append({
-                            'requirement_id': req_id,
+                            'Requirement_ID': req_id,
                             'max_miss_score': max_miss_score,
                             'min_manual_score': min_manual_score,
                             'gap': gap,
@@ -432,7 +460,7 @@ class EnhancedMatchingEvaluator:
         # ENHANCED Discovery summary
         discovery_summary = {
             'total_high_scoring_misses': len(high_scoring_misses),
-            'requirements_with_high_misses': len(set(miss['requirement_id'] for miss in high_scoring_misses)),
+            'requirements_with_high_misses': len(set(miss['Requirement_ID'] for miss in high_scoring_misses)),
             'score_gaps_count': len(score_gaps),
             'discovery_rate': len(high_scoring_misses) / total_requirements if total_requirements > 0 else 0.0
         }
