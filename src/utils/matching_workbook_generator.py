@@ -10,7 +10,10 @@ from datetime import datetime
 from typing import Dict, List, Optional
 import logging
 import json
+import sys  
+import os
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 # Import project utilities
 from src.utils.file_utils import SafeFileHandler
 from src.utils.path_resolver import SmartPathResolver
@@ -120,13 +123,13 @@ class MatchingWorkbookGenerator:
         """Create executive summary with key metrics."""
         
         total_matches = len(enhanced_df)
-        unique_reqs = enhanced_df['ID'].nunique()
+        unique_reqs = enhanced_df['Requirement_ID'].nunique()
         
         # Confidence distribution
-        high_conf = len(enhanced_df[enhanced_df['Combined Score'] >= 0.8])
-        med_conf = len(enhanced_df[(enhanced_df['Combined Score'] >= 0.5) & 
-                                 (enhanced_df['Combined Score'] < 0.8)])
-        low_conf = len(enhanced_df[enhanced_df['Combined Score'] < 0.5])
+        high_conf = len(enhanced_df[enhanced_df['Combined_Score'] >= 0.8])
+        med_conf = len(enhanced_df[(enhanced_df['Combined_Score'] >= 0.5) & 
+                                 (enhanced_df['Combined_Score'] < 0.8)])
+        low_conf = len(enhanced_df[enhanced_df['Combined_Score'] < 0.5])
         
         summary_data = [
             # Overview metrics
@@ -192,7 +195,7 @@ class MatchingWorkbookGenerator:
         
         # ENHANCEMENT: Flexible score column detection
         score_col = None
-        for col in ['Combined Score', 'Combined_Score', 'combined_score', 'score']:
+        for col in ['Combined_Score', 'Combined_Score', 'combined_score', 'score']:
             if col in enhanced_df.columns:
                 score_col = col
                 break
@@ -290,7 +293,7 @@ class MatchingWorkbookGenerator:
                 break
         
         # Find score column
-        for score_col in ['Combined Score', 'Combined_Score', 'combined_score']:
+        for score_col in ['Combined_Score', 'Combined_Score', 'combined_score']:
             if score_col in df.columns:
                 base_columns.append(score_col)
                 break
@@ -340,24 +343,24 @@ class MatchingWorkbookGenerator:
         action_items = []
         
         # Group by confidence level for different action types
-        high_conf = enhanced_df[enhanced_df['Combined Score'] >= 0.8]
-        med_conf = enhanced_df[(enhanced_df['Combined Score'] >= 0.5) & 
-                              (enhanced_df['Combined Score'] < 0.8)]
-        low_conf = enhanced_df[enhanced_df['Combined Score'] < 0.5]
+        high_conf = enhanced_df[enhanced_df['Combined_Score'] >= 0.8]
+        med_conf = enhanced_df[(enhanced_df['Combined_Score'] >= 0.5) & 
+                              (enhanced_df['Combined_Score'] < 0.8)]
+        low_conf = enhanced_df[enhanced_df['Combined_Score'] < 0.5]
         
         # High confidence - approval workflow
         for _, row in high_conf.head(20).iterrows():  # Top 20 for manageable list
             action_items.append({
                 'Priority': 'HIGH',
                 'Action Type': 'APPROVE',
-                'Requirement ID': row['ID'],
+                'Requirement ID': row['Requirement_ID'],
                 'Requirement Name': row.get('Requirement Name', 'N/A'),
-                'Activity Name': row['Activity Name'],
-                'Score': row['Combined Score'],
+                'Activity Name': row['Activity_Name'],
+                'Score': row['Combined_Score'],
                 'Assigned To': '',
                 'Due Date': '',
                 'Status': 'PENDING',
-                'Notes': f'High confidence match ({row["Combined Score"]:.3f}) - fast-track approval'
+                'Notes': f'High confidence match ({row["Combined_Score"]:.3f}) - fast-track approval'
             })
         
         # Medium confidence - detailed review
@@ -365,14 +368,14 @@ class MatchingWorkbookGenerator:
             action_items.append({
                 'Priority': 'MEDIUM',
                 'Action Type': 'REVIEW',
-                'Requirement ID': row['ID'],
+                'Requirement ID': row['Requirement_ID'],
                 'Requirement Name': row.get('Requirement Name', 'N/A'),
-                'Activity Name': row['Activity Name'],
-                'Score': row['Combined Score'],
+                'Activity Name': row['Activity_Name'],
+                'Score': row['Combined_Score'],
                 'Assigned To': '',
                 'Due Date': '',
                 'Status': 'PENDING',
-                'Notes': f'Medium confidence ({row["Combined Score"]:.3f}) - needs detailed review'
+                'Notes': f'Medium confidence ({row["Combined_Score"]:.3f}) - needs detailed review'
             })
         
         # Low confidence - investigation
@@ -380,14 +383,14 @@ class MatchingWorkbookGenerator:
             action_items.append({
                 'Priority': 'LOW',
                 'Action Type': 'INVESTIGATE',
-                'Requirement ID': row['ID'],
+                'Requirement ID': row['Requirement_ID'],
                 'Requirement Name': row.get('Requirement Name', 'N/A'),
-                'Activity Name': row['Activity Name'],
-                'Score': row['Combined Score'],
+                'Activity Name': row['Activity_Name'],
+                'Score': row['Combined_Score'],
                 'Assigned To': '',
                 'Due Date': '',
                 'Status': 'PENDING',
-                'Notes': f'Low confidence ({row["Combined Score"]:.3f}) - manual investigation'
+                'Notes': f'Low confidence ({row["Combined_Score"]:.3f}) - manual investigation'
             })
         
         return pd.DataFrame(action_items)
@@ -448,7 +451,7 @@ class MatchingWorkbookGenerator:
         
         # ENHANCEMENT: Flexible fallback based on available score columns
         score = 0
-        for score_col in ['Combined Score', 'Combined_Score', 'combined_score', 'score']:
+        for score_col in ['Combined_Score', 'Combined_Score', 'combined_score', 'score']:
             if score_col in row and pd.notna(row[score_col]):
                 score = row[score_col]
                 break

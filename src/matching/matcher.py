@@ -160,7 +160,6 @@ class AerospaceMatcher:
             self.use_enhanced_semantic = False
             logger.info("📦 Install sentence-transformers for enhanced semantic matching")
 
-
     def _detect_encoding(self, file_path: str) -> str:
         """Detect file encoding with fallback to UTF-8."""
         try:
@@ -171,39 +170,39 @@ class AerospaceMatcher:
         except:
             return 'utf-8'
         
-    def expand_query_aerospace(self, query_terms: List[str], activity_terms: List[str]) -> Tuple[float, str]:
-        """FIXED: Query expansion using aerospace synonyms with proper scoring."""
+    # def expand_query_aerospace(self, query_terms: List[str], activity_terms: List[str]) -> Tuple[float, str]:
+    #     """FIXED: Query expansion using aerospace synonyms with proper scoring."""
         
-        # Start with original query terms
-        expanded_terms = set(query_terms)
+    #     # Start with original query terms
+    #     expanded_terms = set(query_terms)
+    
+    #     # Apply synonym expansion using domain resources
+    #     for term in query_terms:
+    #         term_lower = term.lower()
+    #         synonyms = self.domain.get_synonyms(term_lower)
+    #         for synonym in synonyms:
+    #             expanded_terms.add(synonym.lower())
         
-        # Apply synonym expansion using domain resources
-        for term in query_terms:
-            term_lower = term.lower()
-            synonyms = self.domain.get_synonyms(term_lower)
-            for synonym in synonyms:
-                expanded_terms.add(synonym.lower())
+    #     # Limit expansion to prevent noise
+    #     expanded_terms = list(expanded_terms)[:6]  # Cap at 6 terms
         
-        # Limit expansion to prevent noise
-        expanded_terms = list(expanded_terms)[:6]  # Cap at 6 terms
+    #     if not expanded_terms:
+    #         return 0.0, "No expansion terms found"
         
-        if not expanded_terms:
-            return 0.0, "No expansion terms found"
+    #     # Calculate overlap with activity terms
+    #     activity_terms_lower = [term.lower() for term in activity_terms]
+    #     overlap = len(set(expanded_terms) & set(activity_terms_lower))
         
-        # Calculate overlap with activity terms
-        activity_terms_lower = [term.lower() for term in activity_terms]
-        overlap = len(set(expanded_terms) & set(activity_terms_lower))
+    #     # Compute score
+    #     score = overlap / len(expanded_terms) if expanded_terms else 0.0
         
-        # Compute score
-        score = overlap / len(expanded_terms) if expanded_terms else 0.0
+    #     # Create explanation
+    #     if overlap > 0:
+    #         explanation = f"Query expansion: {overlap}/{len(expanded_terms)} matches"
+    #     else:
+    #         explanation = f"Query expansion: 0/{len(expanded_terms)} matches"
         
-        # Create explanation
-        if overlap > 0:
-            explanation = f"Query expansion: {overlap}/{len(expanded_terms)} matches"
-        else:
-            explanation = f"Query expansion: 0/{len(expanded_terms)} matches"
-        
-        return score, explanation
+    #     return score, explanation
     
     def _expand_aerospace_abbreviations(self, text: str) -> str:
         """Expand common aerospace abbreviations in text using domain resources."""
@@ -1047,8 +1046,6 @@ def main():
                 evaluation_results=formatted_eval_results,  # Use formatted results
                 repo_manager=repo_manager
             )
-            
-            print(f"✅ Simple dashboard created: {dashboard_path}")
             
         except ImportError:
             print("ℹ️ Simple dashboard not available")
