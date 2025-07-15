@@ -1,0 +1,39 @@
+{
+  "requirements": [
+    "requirement", "specification", "constraint", "criteria", "condition",
+    "compliance", "standard", "protocol", "procedure", "validation"
+  ],
+  "operations": [
+    "mission", "operation", "task", "objective", "goal", "purpose",
+    "command", "control", "instruction", "directive", "execute"
+  ],
+  "systems": [
+    "system", "subsystem", "component", "unit", "module", "assembly",
+    "interface", "connection", "link", "port", "protocol", "bus"
+  ],
+  "components": [
+    "antenna", "dish", "array", "transceiver", "transmitter", "receiver",
+    "actuator", "servo", "motor", "drive", "mechanism", "controller",
+    "sensor", "detector", "instrument", "equipment", "device"
+  ],
+  "data": [
+    "data", "information", "telemetry", "packet", "message", "signal",
+    "transmission", "communication", "uplink", "downlink", "broadcast"
+  ],
+  "flight": [
+    "flight", "trajectory", "path", "orbit", "orbital", "attitude",
+    "orientation", "pointing", "position", "navigation", "guidance"
+  ],
+  "ground": [
+    "ground", "earth", "terrestrial", "base", "station", "facility",
+    "center", "infrastructure", "network", "tracking"
+  ],
+  "power": [
+    "power", "electrical", "energy", "battery", "solar", "voltage",
+    "current", "circuit", "eps", "distribution"
+  ],
+  "thermal": [
+    "thermal", "temperature", "heat", "cooling", "cryogenic",
+    "insulation", "radiator", "heater", "tcs"
+  ]
+}

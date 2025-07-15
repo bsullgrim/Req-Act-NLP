@@ -1,0 +1,17 @@
+{
+  "acs": "attitude control system",
+  "adcs": "attitude determination control system",
+  "eps": "electrical power system",
+  "tcs": "thermal control system",
+  "comm": "communication",
+  "comms": "communications",
+  "nav": "navigation",
+  "gnd": "ground",
+  "cmd": "command",
+  "tx": "transmit",
+  "rx": "receive",
+  "s/c": "spacecraft",
+  "fdir": "fault detection isolation recovery",
+  "moc": "mission operations center",
+  "soc": "spacecraft operations center"
+}

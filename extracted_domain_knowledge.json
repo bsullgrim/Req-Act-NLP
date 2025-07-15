@@ -1,0 +1,180 @@
+{
+  "statistics": {
+    "total_traces": 73,
+    "unique_requirements": 73,
+    "unique_activities": 69
+  },
+  "domain_knowledge": {
+    "vocabulary": {
+      "vocabulary_mappings": {},
+      "synonym_pairs": {},
+      "total_unique_terms": 0
+    },
+    "phrase_patterns": {
+      "requirement_patterns": {
+        "the system": 74,
+        "thermal conditions": 2,
+        "at least 80%": 2,
+        "manufacturing processes": 2,
+        "fiber production": 2,
+        "at least 90%": 5,
+        "the generation": 2,
+        "zblan fiber": 2,
+        "zblan fibers": 3,
+        "all components": 2,
+        "raw materials": 2,
+        "its operational lifetime": 3,
+        "the ability": 2,
+        "system operations": 2,
+        "the orbital platform": 2,
+        "ground stations": 2,
+        "a latency": 2,
+        "a minimum": 2,
+        "the space environment": 2,
+        "5 years": 2,
+        "critical components": 2,
+        "quality control data": 2
+      },
+      "activity_patterns": {
+        "system temperature(context": 4,
+        "power distribution": 3,
+        "solar power(context": 2,
+        "1.1.8 correct defects(context": 3,
+        "process control csc": 14,
+        "system(context system controller": 5,
+        "5.1.3 redirect operations": 4,
+        "system controller": 14,
+        "backup systems(context": 4,
+        "autonomous feedback loop)(context": 10,
+        "hardware modules(context": 2,
+        "array deployment mechanism": 2,
+        "microgravity conditions(context": 3,
+        "inertial measurement unit": 3,
+        "manufacturing parameters": 7,
+        "off-nominal conditions(context": 7,
+        "2.1.3 detect faults(context": 4,
+        "defect detection csc": 7,
+        "automated safety checks)(context": 3,
+        "fault management csc": 6,
+        "automated logging": 3,
+        "autonomous hazard detection)(context": 3,
+        "safety measures": 3,
+        "automated actions": 3,
+        "resource transfers": 5,
+        "automated scheduling)(context": 2,
+        "inventory management csc": 4,
+        "orbit(context separation subsystem": 8,
+        "automated handling": 6,
+        "material handling robotics": 14,
+        "performance metrics": 2,
+        "onboard computer": 9,
+        "autonomous optimization algorithms)(context": 3,
+        "4.1.5 transfer preform": 4,
+        "software installation": 3,
+        "production reports(context": 4,
+        "ground control(context": 6,
+        "2.1.5 test system": 3,
+        "production efficiency(context": 4,
+        "orbital environment": 4,
+        "collision avoidance maneuvers(context": 2,
+        "gn&c csc": 2,
+        "remote commands(context command": 4,
+        "data handling": 7,
+        "cool/ anneal": 2,
+        "fiber annealer": 2,
+        "4.1.4 store preform": 3,
+        "target parameters(context": 3,
+        "material storage unit": 3,
+        "orbital maneuvers(context": 3,
+        "remote overrides(context": 3,
+        "production anomalies(context": 3,
+        "process monitoring camera": 3,
+        "policy changes(context": 2
+      },
+      "common_phrases": {}
+    },
+    "entity_mappings": {
+      "at least three": [
+        "7.1.2 prepare",
+        "4.1.3 receive",
+        "1.1.9 adjust",
+        "7.1.1 receive",
+        "1.3.3 adjust",
+        "7.1.3 install",
+        "7.2.1 prepare",
+        "4.2.2 coordinate"
+      ],
+      "at least two": [
+        "7.2.1 prepare",
+        "7.1.1 receive"
+      ],
+      "1": [
+        "1.1.7 monitor"
+      ],
+      "6": [
+        "6.2.3 generate"
+      ]
+    },
+    "semantic_clusters": {
+      "requirement_clusters": [
+        {
+          "anchor": "The system shall maintain thermal conditions within ±1°C of the specified temperature range for optimal ZBLAN fiber production.",
+          "similar_requirements": [
+            "The system shall maintain a production rate of at least 500 meters of ZBLAN fiber per day.",
+            "The system shall maintain a microgravity environment with less than 10^-6 g during ZBLAN fiber production.",
+            "The system shall maintain thermal conditions within specified limits to ensure optimal operation of all components."
+          ]
+        },
+        {
+          "anchor": "The system shall maintain consistent product quality across production runs, with less than 5% variation in key quality metrics between batches.",
+          "similar_requirements": [
+            "The system shall maintain a microgravity environment with less than 10^-6 g during ZBLAN fiber production."
+          ]
+        },
+        {
+          "anchor": "The system shall achieve a manufacturing yield of at least 95% usable fiber.",
+          "similar_requirements": [
+            "The system shall maintain a production rate of at least 500 meters of ZBLAN fiber per day."
+          ]
+        },
+        {
+          "anchor": "The system shall maintain a production rate of at least 500 meters of ZBLAN fiber per day.",
+          "similar_requirements": [
+            "The system shall maintain thermal conditions within ±1°C of the specified temperature range for optimal ZBLAN fiber production.",
+            "The system shall achieve a manufacturing yield of at least 95% usable fiber.",
+            "The system shall maintain a microgravity environment with less than 10^-6 g during ZBLAN fiber production."
+          ]
+        },
+        {
+          "anchor": "The system shall produce ZBLAN fibers with attenuation rates of 0.05 dB/km or lower at 2.5 μm wavelength.",
+          "similar_requirements": [
+            "The system shall produce ZBLAN fibers with less than 1 crystallization defect per kilometer of fiber manufactured in microgravity"
+          ]
+        }
+      ]
+    },
+    "matching_rules": {
+      "strong_indicators": {
+        "shared_word:thermal": 8,
+        "shared_word:system": 38,
+        "shared_word:power": 7,
+        "shared_word:fiber": 13,
+        "shared_word:zblan": 4,
+        "shared_word:production": 5,
+        "shared_word:microgravity": 4,
+        "shared_word:manufacturing": 3,
+        "shared_word:process": 3,
+        "shared_word:safety": 10,
+        "shared_word:and": 16,
+        "shared_word:radiation": 5,
+        "shared_word:for": 6,
+        "shared_word:ground": 3,
+        "shared_word:data": 16,
+        "shared_word:environment": 3,
+        "shared_word:material": 3
+      },
+      "weak_indicators": {},
+      "anti_patterns": {}
+    }
+  }
+}
