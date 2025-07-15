@@ -24,7 +24,7 @@ with comprehensive performance optimizations and explainable AI capabilities.
 - Overall precision: 40-50% → 75-85%
 """
 
-from .matcher import FinalCleanMatcher, MatchExplanation
+from .matcher import AerospaceMatcher, MatchExplanation
 
 __version__ = "2.1.0"  # Updated for enhanced performance
 __author__ = "Requirements Traceability Team"
@@ -61,7 +61,7 @@ def create_enhanced_matcher(model_name: str = "en_core_web_trf", repo_manager=No
         repo_manager = RepositoryStructureManager("outputs")
         repo_manager.setup_repository_structure()
     
-    return FinalCleanMatcher(model_name=model_name, repo_manager=repo_manager)
+    return AerospaceMatcher(model_name=model_name, repo_manager=repo_manager)
 
 def get_optimized_weights():
     """

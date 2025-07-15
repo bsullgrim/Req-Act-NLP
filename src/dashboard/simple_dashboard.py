@@ -51,42 +51,73 @@ class SimpleDashboard:
         return str(output_path)
     
     def _calculate_summary_stats(self, df: pd.DataFrame, eval_results: Optional[Dict]) -> Dict:
-        """Calculate key summary statistics."""
+        """Calculate key summary statistics - ENHANCED COLUMN DETECTION."""
+        
+        # Flexible column detection
+        score_col = None
+        id_col = None
+        
+        # Find score column (multiple possible names)
+        for col in ['Combined Score', 'Combined_Score', 'combined_score', 'score']:
+            if col in df.columns:
+                score_col = col
+                break
+        
+        # Find ID column (multiple possible names)
+        for col in ['ID', 'Requirement_ID', 'requirement_id', 'req_id']:
+            if col in df.columns:
+                id_col = col
+                break
         
         stats = {
             'total_matches': len(df),
-            'unique_requirements': df['ID'].nunique() if 'ID' in df.columns else 0,
-            'avg_score': df['Combined Score'].mean() if 'Combined Score' in df.columns else 0,
-            'high_confidence': len(df[df['Combined Score'] >= 0.8]) if 'Combined Score' in df.columns else 0,
-            'medium_confidence': len(df[(df['Combined Score'] >= 0.5) & (df['Combined Score'] < 0.8)]) if 'Combined Score' in df.columns else 0,
-            'low_confidence': len(df[df['Combined Score'] < 0.5]) if 'Combined Score' in df.columns else 0
+            'unique_requirements': df[id_col].nunique() if id_col else 0,
+            'avg_score': df[score_col].mean() if score_col else 0,
+            'high_confidence': len(df[df[score_col] >= 0.8]) if score_col else 0,
+            'medium_confidence': len(df[(df[score_col] >= 0.5) & (df[score_col] < 0.8)]) if score_col else 0,
+            'low_confidence': len(df[df[score_col] < 0.5]) if score_col else 0
         }
         
-        # Quality stats
-        if 'Quality_Grade' in df.columns:
+        # Quality stats (if available) - flexible column detection
+        quality_grade_col = None
+        quality_score_col = None
+        
+        for col in ['Quality_Grade', 'quality_grade', 'Quality Grade']:
+            if col in df.columns:
+                quality_grade_col = col
+                break
+        
+        for col in ['Quality_Score', 'quality_score', 'Quality Score']:
+            if col in df.columns:
+                quality_score_col = col
+                break
+        
+        if quality_grade_col:
             # Get unique requirements for quality (not matches)
-            unique_req_quality = df.groupby('ID').first() if 'ID' in df.columns else df
-            stats['quality_distribution'] = unique_req_quality['Quality_Grade'].value_counts().to_dict()
-            stats['avg_quality'] = unique_req_quality['Quality_Score'].mean() if 'Quality_Score' in unique_req_quality.columns else 0
+            unique_req_quality = df.groupby(id_col).first() if id_col else df
+            stats['quality_distribution'] = unique_req_quality[quality_grade_col].value_counts().to_dict()
+            stats['avg_quality'] = unique_req_quality[quality_score_col].mean() if quality_score_col else 0
         else:
             stats['quality_distribution'] = {}
             stats['avg_quality'] = 0
         
-        # Evaluation stats (if available)
+        # Evaluation stats (compatible with simple evaluator format)
         if eval_results:
-            agg_metrics = eval_results.get('aggregate_metrics', {})
-            stats['f1_at_5'] = agg_metrics.get('f1_at_5', {}).get('mean', 0)
-            stats['coverage'] = eval_results.get('coverage', 0)
+            # Handle both direct metrics and nested format
+            if 'aggregate_metrics' in eval_results:
+                stats['f1_at_5'] = eval_results['aggregate_metrics'].get('f1_at_5', {}).get('mean', 0)
+                stats['coverage'] = eval_results.get('coverage', 0)
+            else:
+                stats['f1_at_5'] = eval_results.get('f1_at_5', 0)
+                stats['coverage'] = eval_results.get('coverage', 0)
             
-            # Discovery stats
-            discovery = eval_results.get('discovery_analysis', {}).get('summary', {})
-            stats['discoveries'] = discovery.get('total_high_scoring_misses', 0)
+            stats['discoveries'] = 0  # Simple evaluator doesn't have discovery analysis
         else:
             stats['f1_at_5'] = 0
             stats['coverage'] = 0
             stats['discoveries'] = 0
         
-        return stats
+        return stats        
     
     def _build_html(self, df: pd.DataFrame, stats: Dict, eval_results: Optional[Dict]) -> str:
         """Build complete HTML dashboard."""

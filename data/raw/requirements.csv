@@ -72,28 +72,3 @@ C.4,C.4 National Goals,"The system shall demonstrate compatibility with at least
 C.3,C.3 Power Budget,The system shall operate within the power budget allocated by the host space platform if it is being hosted
 C.2,C.2 Debris Mitigation,The system shall adhere to international space debris mitigation guidelines.
 C.1,C.1 Safety Compliance,The system shall comply with all relevant NASA safety standards for operation on crewed space platforms.
-X.1,Ambiguous Terms,The system shall provide appropriate response times for user interactions.
-X.2,No Verifiability,The system shall be user-friendly and provide a good experience.
-X.3,Implementation Detail,The system shall store data using PostgreSQL database with Redis caching.
-X.4,Compound Requirement,The system shall authenticate users and log all activities and send notifications and generate reports.
-X.5,Missing Modal Verb,The interface display the current status to operators.
-X.6,Passive Voice,User credentials are validated by the authentication module when login attempts are made.
-X.7,Too Short,Fast startup.
-X.8,Too Long,"The system shall provide a comprehensive user interface that allows operators to monitor all subsystem statuses including but not limited to power management, thermal control, communication links, navigation systems, and payload operations while also enabling configuration of system parameters, viewing of historical data trends, managing user accounts and permissions, generating custom reports, and performing diagnostic procedures."
-X.9,Multiple Ambiguity,The system shall efficiently process data as needed and provide sufficient bandwidth where applicable.
-X.10,No Subject/Object,Shall respond within reasonable timeframe.
-X.11,Implementation + Ambiguous,Navigation shall be implemented using GPS with appropriate accuracy for the mission.
-X.12,Brand Name Implementation,The communication system shall utilize Iridium satellite constellation for global coverage.
-X.13,Vague Measurement,The sensor shall have good accuracy and reasonable precision.
-X.14,No Units Comparison,The motor shall operate faster than the previous version.
-X.15,Empty Requirement,
-X.16,Passive + Compound,Data is processed by the central unit and results are transmitted to ground stations and alerts are generated when anomalies are detected.
-X.17,Solution Language,Temperature control shall be achieved through the use of thermoelectric coolers and heat exchangers.
-X.18,Multiple Modal Issues,The system might process data and could generate reports or may send alerts.
-X.19,Ambiguous + No Verifiability,The interface shall provide clean display with nice graphics and simple navigation.
-X.20,All Issues Combined,Data might be stored using MongoDB and transmitted efficiently via REST API with good performance and appropriate security as needed.
-X.21,Scientific Notation (Good),The system shall maintain microgravity environment with less than 10^-6 g during operations.
-X.22,Proper Units (Good),The motor shall provide torque of 50 Nm ±2% at operating temperature range -40°C to 85°C.
-X.23,Standards Compliance (Good),The software shall comply with DO-178B Level A certification requirements.
-X.24,Boolean Verifiable (Good),The emergency shutdown system shall be enabled during all powered operations.
-X.25,Implementation with Units,The gyroscope shall use MEMS technology and provide accuracy of ±0.1°/hr.

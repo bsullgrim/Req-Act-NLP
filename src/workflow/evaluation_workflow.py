@@ -11,7 +11,7 @@ from typing import Optional, Dict
 # Import your existing components
 from src.evaluation.evaluator import EnhancedMatchingEvaluator
 from src.utils.repository_setup import RepositoryStructureManager
-from matching_workbook_generator import create_matching_workbook
+from src.utils.matching_workbook_generator import create_matching_workbook
 
 logger = logging.getLogger(__name__)
 

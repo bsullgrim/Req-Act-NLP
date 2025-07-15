@@ -19,7 +19,7 @@ os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 # Import core components
 from src.matching.matcher import FinalCleanMatcher
 from src.evaluation.evaluator import EnhancedMatchingEvaluator
-from matching_workbook_generator import MatchingWorkbookGenerator
+from src.utils.matching_workbook_generator import MatchingWorkbookGenerator
 
 # Import utils for file operations
 from src.utils.file_utils import SafeFileHandler

@@ -11,20 +11,116 @@ import json
 from typing import Dict, List, Tuple, Set
 import logging
 from pathlib import Path
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 import re
+import sys
+import os
+
+# Add project root to path for imports
+current_file = Path(__file__).resolve()
+project_root = current_file.parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+# Import project utilities
+try:
+    from src.utils.file_utils import SafeFileHandler
+    from src.utils.path_resolver import SmartPathResolver
+    from src.utils.repository_setup import RepositoryStructureManager
+    UTILS_AVAILABLE = True
+    print("✅ Successfully imported project utils")
+except ImportError as e:
+    print(f"⚠️ Could not import utils: {e}")
+    UTILS_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 class DomainKnowledgeBuilder:
     """Extract domain knowledge from existing manual requirement-activity traces."""
     
-    def __init__(self, spacy_model: str = "en_core_web_sm"):
-        self.nlp = spacy.load(spacy_model)
+    def __init__(self, spacy_model: str = "en_core_web_trf"):
+        # Initialize spaCy with fallback models
+        try:
+            self.nlp = spacy.load(spacy_model)
+            logger.info(f"Loaded spaCy model: {spacy_model}")
+        except OSError:
+            logger.warning(f"spaCy model '{spacy_model}' not found. Trying fallback models...")
+            fallback_models = ["en_core_web_lg", "en_core_web_md", "en_core_web_sm"]
+            model_loaded = False
+            
+            for fallback in fallback_models:
+                try:
+                    self.nlp = spacy.load(fallback)
+                    logger.info(f"Loaded fallback spaCy model: {fallback}")
+                    model_loaded = True
+                    break
+                except OSError:
+                    continue
+            
+            if not model_loaded:
+                logger.error("No spaCy models available. Using basic text processing.")
+                self.nlp = None
+        
+        # Setup project utilities for smart file finding
+        if UTILS_AVAILABLE:
+            self.repo_manager = RepositoryStructureManager("outputs")
+            self.repo_manager.setup_repository_structure()
+            self.file_handler = SafeFileHandler(self.repo_manager)
+            self.path_resolver = SmartPathResolver(self.repo_manager)
+        else:
+            self.repo_manager = None
+            self.file_handler = None
+            self.path_resolver = None
+        
+        # Knowledge storage containers
         self.domain_patterns = {}
         self.vocabulary_mappings = {}
         self.phrase_patterns = {}
         self.entity_mappings = {}
+    
+    def _find_manual_traces_file(self, filename: str) -> str:
+        """Find manual traces file using project path resolution."""
         
+        if UTILS_AVAILABLE and self.path_resolver:
+            # Use project path resolution system
+            file_mapping = {'ground_truth': filename}
+            resolved_paths = self.path_resolver.resolve_input_files(file_mapping)
+            resolved_path = resolved_paths['ground_truth']
+            
+            if Path(resolved_path).exists():
+                print(f"✅ Found manual traces: {resolved_path}")
+                return resolved_path
+            else:
+                print(f"❌ File not found at resolved path: {resolved_path}")
+        
+        # Fallback search in common locations
+        search_paths = [
+            filename,
+            f"data/raw/{filename}",
+            f"data/{filename}",
+            f"examples/{filename}",
+            f"../data/{filename}",
+        ]
+        
+        print(f"🔍 Searching for {filename} in common locations...")
+        for path in search_paths:
+            if Path(path).exists():
+                print(f"✅ Found: {path}")
+                return path
+            else:
+                print(f"   ❌ Not found: {path}")
+        
+        # Show available files for debugging
+        print(f"\n💡 Available CSV files in current directory:")
+        csv_files = list(Path(".").glob("*.csv"))
+        if csv_files:
+            for csv_file in csv_files:
+                print(f"   📄 {csv_file}")
+        else:
+            print("   (No CSV files found)")
+        
+        raise FileNotFoundError(
+            f"Could not find {filename}. Please ensure the file exists."
+        )
+    
     def analyze_manual_traces(self, manual_traces_file: str) -> Dict:
         """
         Analyze existing manual traces to extract domain knowledge.
@@ -32,8 +128,14 @@ class DomainKnowledgeBuilder:
         """
         print("Loading and analyzing manual traces...")
         
-        # Load manual traces
-        traces_df = pd.read_csv(manual_traces_file)
+        # Find file using path resolution
+        actual_file_path = self._find_manual_traces_file(manual_traces_file)
+        
+        # Load with project file handler if available
+        if UTILS_AVAILABLE and self.file_handler:
+            traces_df = self.file_handler.safe_read_csv(actual_file_path)
+        else:
+            traces_df = pd.read_csv(actual_file_path)
         
         # Basic statistics
         stats = {
@@ -46,20 +148,10 @@ class DomainKnowledgeBuilder:
         
         # Extract domain knowledge
         domain_knowledge = {}
-        
-        # 1. Vocabulary Analysis
         domain_knowledge['vocabulary'] = self._extract_vocabulary_patterns(traces_df)
-        
-        # 2. Phrase Patterns
         domain_knowledge['phrase_patterns'] = self._extract_phrase_patterns(traces_df)
-        
-        # 3. Entity Mappings
         domain_knowledge['entity_mappings'] = self._extract_entity_mappings(traces_df)
-        
-        # 4. Semantic Clusters
         domain_knowledge['semantic_clusters'] = self._find_semantic_clusters(traces_df)
-        
-        # 5. Matching Rules
         domain_knowledge['matching_rules'] = self._derive_matching_rules(traces_df)
         
         return {
@@ -82,9 +174,13 @@ class DomainKnowledgeBuilder:
                 continue
                 
             # Process requirement
-            req_doc = self.nlp(req_text.lower())
-            req_tokens = {token.lemma_ for token in req_doc 
-                         if not token.is_stop and token.is_alpha and len(token.text) > 2}
+            req_doc = self.nlp(req_text.lower()) if self.nlp else None
+            if req_doc:
+                req_tokens = {token.lemma_ for token in req_doc 
+                             if not token.is_stop and token.is_alpha and len(token.text) > 2}
+            else:
+                # Fallback text processing
+                req_tokens = set(re.findall(r'\b[a-zA-Z]{3,}\b', req_text.lower()))
             
             # Process each linked activity
             for activity in activities:
@@ -92,14 +188,14 @@ class DomainKnowledgeBuilder:
                 if not activity:
                     continue
                     
-                act_doc = self.nlp(activity.lower())
-                act_tokens = {token.lemma_ for token in act_doc 
-                             if not token.is_stop and token.is_alpha and len(token.text) > 2}
+                if self.nlp:
+                    act_doc = self.nlp(activity.lower())
+                    act_tokens = {token.lemma_ for token in act_doc 
+                                 if not token.is_stop and token.is_alpha and len(token.text) > 2}
+                else:
+                    act_tokens = set(re.findall(r'\b[a-zA-Z]{3,}\b', activity.lower()))
                 
-                # Find vocabulary overlaps
-                common_tokens = req_tokens & act_tokens
-                
-                # Find potential synonyms (tokens that co-occur but are different)
+                # Find potential synonyms
                 for req_token in req_tokens:
                     for act_token in act_tokens:
                         if req_token != act_token and self._are_semantically_similar(req_token, act_token):
@@ -134,20 +230,11 @@ class DomainKnowledgeBuilder:
                 continue
             
             # Extract requirement patterns
-            req_doc = self.nlp(req_text)
-            
-            # Noun phrases
-            for chunk in req_doc.noun_chunks:
-                if len(chunk.text.split()) <= 3:  # Reasonable phrase length
-                    phrase_patterns['requirement_patterns'][chunk.text.lower().strip()] += 1
-            
-            # Verb phrases (simple: verb + object)
-            for token in req_doc:
-                if token.pos_ == "VERB" and token.dep_ == "ROOT":
-                    objects = [child.text for child in token.children if child.dep_ in ["dobj", "pobj"]]
-                    if objects:
-                        verb_phrase = f"{token.lemma_} {' '.join(objects)}"
-                        phrase_patterns['requirement_patterns'][verb_phrase.lower()] += 1
+            if self.nlp:
+                req_doc = self.nlp(req_text)
+                for chunk in req_doc.noun_chunks:
+                    if len(chunk.text.split()) <= 3:
+                        phrase_patterns['requirement_patterns'][chunk.text.lower().strip()] += 1
             
             # Process activities
             for activity in activities:
@@ -155,10 +242,11 @@ class DomainKnowledgeBuilder:
                 if not activity:
                     continue
                     
-                act_doc = self.nlp(activity)
-                for chunk in act_doc.noun_chunks:
-                    if len(chunk.text.split()) <= 3:
-                        phrase_patterns['activity_patterns'][chunk.text.lower().strip()] += 1
+                if self.nlp:
+                    act_doc = self.nlp(activity)
+                    for chunk in act_doc.noun_chunks:
+                        if len(chunk.text.split()) <= 3:
+                            phrase_patterns['activity_patterns'][chunk.text.lower().strip()] += 1
         
         # Filter to patterns that appear multiple times
         filtered_patterns = {}
@@ -173,6 +261,9 @@ class DomainKnowledgeBuilder:
         entity_mappings = defaultdict(set)
         
         print("  Extracting entity mappings...")
+        
+        if not self.nlp:
+            return {}
         
         for _, row in traces_df.iterrows():
             req_text = str(row.get('Requirement Text', ''))
@@ -206,48 +297,29 @@ class DomainKnowledgeBuilder:
         
         # Collect all requirement texts
         req_texts = []
-        act_texts = []
         
         for _, row in traces_df.iterrows():
             req_text = str(row.get('Requirement Text', ''))
-            activities = str(row.get('Satisfied By', '')).split(',')
-            
             if req_text.strip():
                 req_texts.append(req_text)
-                
-            for activity in activities:
-                activity = activity.strip()
-                if activity:
-                    act_texts.append(activity)
         
-        # Use TF-IDF to find clusters
+        # Simple clustering without sklearn dependency
+        clusters = []
         if len(req_texts) > 1:
-            vectorizer = TfidfVectorizer(max_features=1000, stop_words='english', ngram_range=(1, 2))
-            try:
-                req_vectors = vectorizer.fit_transform(req_texts)
+            # Basic similarity clustering
+            for i, text1 in enumerate(req_texts[:10]):  # Limit for performance
+                similar_texts = []
+                for j, text2 in enumerate(req_texts):
+                    if i != j and self._simple_text_similarity(text1, text2) > 0.3:
+                        similar_texts.append(text2)
                 
-                # Simple clustering: find highly similar pairs
-                similarity_matrix = cosine_similarity(req_vectors)
-                
-                clusters = []
-                threshold = 0.5  # Similarity threshold
-                
-                for i in range(len(req_texts)):
-                    similar_indices = np.where(similarity_matrix[i] > threshold)[0]
-                    if len(similar_indices) > 1:  # More than just itself
-                        cluster = [req_texts[j] for j in similar_indices if j != i]
-                        if cluster:
-                            clusters.append({
-                                'anchor': req_texts[i],
-                                'similar_requirements': cluster[:3],  # Limit to top 3
-                                'similarity_scores': [similarity_matrix[i][j] for j in similar_indices if j != i][:3]
-                            })
-                
-                return {'requirement_clusters': clusters[:10]}  # Top 10 clusters
-            except:
-                return {'requirement_clusters': []}
+                if similar_texts:
+                    clusters.append({
+                        'anchor': text1,
+                        'similar_requirements': similar_texts[:3]
+                    })
         
-        return {'requirement_clusters': []}
+        return {'requirement_clusters': clusters[:10]}
     
     def _derive_matching_rules(self, traces_df: pd.DataFrame) -> Dict:
         """Derive high-level matching rules from successful traces."""
@@ -259,7 +331,7 @@ class DomainKnowledgeBuilder:
             'anti_patterns': Counter()
         }
         
-        # Analyze successful matches for patterns
+        # Simple rule extraction
         for _, row in traces_df.iterrows():
             req_text = str(row.get('Requirement Text', ''))
             activities = str(row.get('Satisfied By', '')).split(',')
@@ -267,32 +339,19 @@ class DomainKnowledgeBuilder:
             if not req_text.strip():
                 continue
             
-            req_doc = self.nlp(req_text.lower())
+            req_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', req_text.lower()))
             
             for activity in activities:
                 activity = activity.strip()
                 if not activity:
                     continue
                     
-                act_doc = self.nlp(activity.lower())
+                act_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', activity.lower()))
                 
-                # Rule: Direct verb matches are strong indicators
-                req_verbs = {token.lemma_ for token in req_doc if token.pos_ == "VERB"}
-                act_verbs = {token.lemma_ for token in act_doc if token.pos_ == "VERB"}
-                verb_overlap = req_verbs & act_verbs
-                
-                for verb in verb_overlap:
-                    rules['strong_indicators'][f"shared_verb:{verb}"] += 1
-                
-                # Rule: Shared technical nouns
-                req_nouns = {token.lemma_ for token in req_doc 
-                           if token.pos_ in ["NOUN", "PROPN"] and len(token.text) > 3}
-                act_nouns = {token.lemma_ for token in act_doc 
-                           if token.pos_ in ["NOUN", "PROPN"] and len(token.text) > 3}
-                noun_overlap = req_nouns & act_nouns
-                
-                for noun in noun_overlap:
-                    rules['strong_indicators'][f"shared_noun:{noun}"] += 1
+                # Shared words are strong indicators
+                shared_words = req_words & act_words
+                for word in shared_words:
+                    rules['strong_indicators'][f"shared_word:{word}"] += 1
         
         # Filter rules by frequency
         filtered_rules = {}
@@ -301,8 +360,15 @@ class DomainKnowledgeBuilder:
         
         return filtered_rules
     
-    def _are_semantically_similar(self, word1: str, word2: str, threshold: float = 0.6) -> bool:
+    def _are_semantically_similar(self, word1: str, word2: str, threshold: float = 0.3) -> bool:
         """Check if two words are semantically similar using spaCy vectors."""
+        if not self.nlp:
+            # Fallback: simple character similarity
+            if abs(len(word1) - len(word2)) > 3:
+                return False
+            common_chars = set(word1) & set(word2)
+            return len(common_chars) >= 3
+        
         try:
             token1 = self.nlp(word1)[0]
             token2 = self.nlp(word2)[0]
@@ -313,6 +379,19 @@ class DomainKnowledgeBuilder:
         except:
             pass
         return False
+    
+    def _simple_text_similarity(self, text1: str, text2: str) -> float:
+        """Simple text similarity without external dependencies."""
+        words1 = set(re.findall(r'\b[a-zA-Z]{3,}\b', text1.lower()))
+        words2 = set(re.findall(r'\b[a-zA-Z]{3,}\b', text2.lower()))
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = len(words1 & words2)
+        union = len(words1 | words2)
+        
+        return intersection / union if union > 0 else 0.0
     
     def save_domain_knowledge(self, domain_knowledge: Dict, output_file: str = "domain_knowledge.json"):
         """Save extracted domain knowledge to file."""
@@ -326,7 +405,6 @@ class DomainKnowledgeBuilder:
                 return [convert_counters(item) for item in obj]
             else:
                 return obj
-        
         
         serializable_knowledge = convert_counters(domain_knowledge)
         
@@ -356,24 +434,10 @@ class DomainKnowledgeBuilder:
                 if similar_term not in synonyms[term]:
                     synonyms[term].append(similar_term)
         
-        # Add high-confidence synonym pairs
-        synonym_pairs = domain_knowledge.get('domain_knowledge', {}).get('vocabulary', {}).get('synonym_pairs', {})
-        
-        for (term1, term2), frequency in synonym_pairs.items():
-            if frequency >= 3:  # High confidence threshold
-                if term1 not in synonyms:
-                    synonyms[term1] = []
-                if term2 not in synonyms[term1]:
-                    synonyms[term1].append(term2)
-                
-                if term2 not in synonyms:
-                    synonyms[term2] = []
-                if term1 not in synonyms[term2]:
-                    synonyms[term2].append(term1)
-        
         return synonyms
 
 
+# Main function
 def main():
     """Example usage of domain knowledge builder."""
     print("Building Domain Knowledge from Manual Traces")
@@ -382,54 +446,35 @@ def main():
     # Initialize builder
     builder = DomainKnowledgeBuilder()
     
-    # Analyze existing manual traces
-    domain_analysis = builder.analyze_manual_traces("manual_matches.csv")
-    
-    # Print summary
-    stats = domain_analysis['statistics']
-    knowledge = domain_analysis['domain_knowledge']
-    
-    print(f"\nAnalysis Summary:")
-    print(f"  Total traces analyzed: {stats['total_traces']}")
-    print(f"  Unique requirements: {stats['unique_requirements']}")
-    print(f"  Unique activities: {stats['unique_activities']}")
-    
-    print(f"\nDomain Knowledge Extracted:")
-    
-    vocab_info = knowledge.get('vocabulary', {})
-    print(f"  Vocabulary mappings: {vocab_info.get('total_unique_terms', 0)}")
-    print(f"  Synonym pairs found: {len(vocab_info.get('synonym_pairs', {}))}")
-    
-    phrase_info = knowledge.get('phrase_patterns', {})
-    req_patterns = len(phrase_info.get('requirement_patterns', {}))
-    act_patterns = len(phrase_info.get('activity_patterns', {}))
-    print(f"  Requirement patterns: {req_patterns}")
-    print(f"  Activity patterns: {act_patterns}")
-    
-    entity_info = knowledge.get('entity_mappings', {})
-    print(f"  Entity mappings: {len(entity_info)}")
-    
-    clusters = knowledge.get('semantic_clusters', {}).get('requirement_clusters', [])
-    print(f"  Semantic clusters: {len(clusters)}")
-    
-    rules = knowledge.get('matching_rules', {})
-    strong_rules = len(rules.get('strong_indicators', {}))
-    print(f"  Strong matching rules: {strong_rules}")
-    
-    # Save domain knowledge
-    builder.save_domain_knowledge(domain_analysis, "extracted_domain_knowledge.json")
-    
-    # Create enhanced synonyms
-    enhanced_synonyms = builder.create_enhanced_synonyms(domain_analysis)
-    with open("enhanced_synonyms.json", 'w') as f:
-        json.dump(enhanced_synonyms, f, indent=2)
-    
-    print(f"\nEnhanced synonym dictionary created with {len(enhanced_synonyms)} terms")
-    
-    print(f"\nNext steps:")
-    print(f"1. Review extracted_domain_knowledge.json")
-    print(f"2. Use enhanced_synonyms.json in your matcher")
-    print(f"3. Consider the identified patterns for custom scoring")
+    try:
+        # Analyze existing manual traces
+        domain_analysis = builder.analyze_manual_traces("manual_matches.csv")
+        
+        # Print summary
+        stats = domain_analysis['statistics']
+        knowledge = domain_analysis['domain_knowledge']
+        
+        print(f"\nAnalysis Summary:")
+        print(f"  Total traces analyzed: {stats['total_traces']}")
+        print(f"  Unique requirements: {stats['unique_requirements']}")
+        print(f"  Unique activities: {stats['unique_activities']}")
+        
+        # Save domain knowledge
+        builder.save_domain_knowledge(domain_analysis, "extracted_domain_knowledge.json")
+        
+        # Create enhanced synonyms
+        enhanced_synonyms = builder.create_enhanced_synonyms(domain_analysis)
+        with open("enhanced_synonyms.json", 'w') as f:
+            json.dump(enhanced_synonyms, f, indent=2)
+        
+        print(f"\nEnhanced synonym dictionary created with {len(enhanced_synonyms)} terms")
+        
+    except FileNotFoundError as e:
+        print(f"\n❌ File not found: {e}")
+        print(f"💡 The file should be in one of these locations:")
+        print(f"   - Current directory: ./manual_matches.csv")
+        print(f"   - Data directory: ./data/raw/manual_matches.csv")
+        print(f"   - Or specify full path: python domain_knowledge_builder.py")
 
 
 if __name__ == "__main__":
