@@ -13,6 +13,7 @@ import math
 import chardet
 import spacy
 import json
+import time
 import re
 import torch
 from dataclasses import dataclass
@@ -169,41 +170,7 @@ class AerospaceMatcher:
                 return result['encoding'] or 'utf-8'
         except:
             return 'utf-8'
-        
-    # def expand_query_aerospace(self, query_terms: List[str], activity_terms: List[str]) -> Tuple[float, str]:
-    #     """FIXED: Query expansion using aerospace synonyms with proper scoring."""
-        
-    #     # Start with original query terms
-    #     expanded_terms = set(query_terms)
-    
-    #     # Apply synonym expansion using domain resources
-    #     for term in query_terms:
-    #         term_lower = term.lower()
-    #         synonyms = self.domain.get_synonyms(term_lower)
-    #         for synonym in synonyms:
-    #             expanded_terms.add(synonym.lower())
-        
-    #     # Limit expansion to prevent noise
-    #     expanded_terms = list(expanded_terms)[:6]  # Cap at 6 terms
-        
-    #     if not expanded_terms:
-    #         return 0.0, "No expansion terms found"
-        
-    #     # Calculate overlap with activity terms
-    #     activity_terms_lower = [term.lower() for term in activity_terms]
-    #     overlap = len(set(expanded_terms) & set(activity_terms_lower))
-        
-    #     # Compute score
-    #     score = overlap / len(expanded_terms) if expanded_terms else 0.0
-        
-    #     # Create explanation
-    #     if overlap > 0:
-    #         explanation = f"Query expansion: {overlap}/{len(expanded_terms)} matches"
-    #     else:
-    #         explanation = f"Query expansion: 0/{len(expanded_terms)} matches"
-        
-    #     return score, explanation
-    
+           
     def _expand_aerospace_abbreviations(self, text: str) -> str:
         """Expand common aerospace abbreviations in text using domain resources."""
         text_lower = text.lower()
@@ -382,34 +349,12 @@ class AerospaceMatcher:
         logger.info(f"📊 Using fallback domain weights: {len(domain_weights)} terms")
         return domain_weights
     
-    def compute_semantic_similarity(self, req_doc, act_doc, req_idx: int = None, act_idx: int = None) -> Tuple[float, str]:
+    def compute_semantic_similarity(self, req_doc, act_doc, req_idx=None, act_idx=None):
         """
-        ENHANCED: Compute semantic similarity with optional precomputed embeddings.
+        ENHANCED: Compute semantic similarity with intelligent fallbacks.
         """
         
-        # FAST PATH: If we have precomputed embeddings and indices, use them
-        if (hasattr(self, '_req_embeddings') and hasattr(self, '_act_embeddings') and 
-            self._req_embeddings is not None and self._act_embeddings is not None and
-            req_idx is not None and act_idx is not None):
-            
-            try:
-                req_emb = self._req_embeddings[req_idx]
-                act_emb = self._act_embeddings[act_idx]
-                
-                # Fast cosine similarity with normalized embeddings
-                similarity = float(np.dot(req_emb, act_emb))
-                # CRITICAL FIX: Transform from [-1,1] to [0,1]
-                similarity = (similarity + 1) / 2
-                similarity = max(0, similarity)
-                
-                explanation = f"Enhanced semantic (batched): {similarity:.3f}"
-                return similarity, explanation
-                
-            except Exception as e:
-                logger.warning(f"Precomputed embedding lookup failed: {e}")
-                # Fall through to original method
-        
-        # ORIGINAL METHOD (keep the same transformation)
+        # Try enhanced semantic model first
         if self.use_enhanced_semantic:
             req_text = req_doc.text
             act_text = act_doc.text
@@ -422,7 +367,6 @@ class AerospaceMatcher:
                 embeddings = self.semantic_model.encode([req_text, act_text], batch_size=2, show_progress_bar=False)
                 similarity = float(np.dot(embeddings[0], embeddings[1]) / 
                                 (np.linalg.norm(embeddings[0]) * np.linalg.norm(embeddings[1])))
-                # Keep the same transformation as original
                 similarity = max(0, (similarity + 1) / 2)
                 
                 explanation = f"Enhanced semantic: {similarity:.3f}"
@@ -433,9 +377,19 @@ class AerospaceMatcher:
             except Exception as e:
                 logger.warning(f"Semantic model error: {e}")
         
-        # Fallback to spaCy similarity (unchanged)
-        similarity = req_doc.similarity(act_doc)
-        explanation = f"spaCy semantic: {similarity:.3f}"
+        # ENHANCED FALLBACK: Check if spaCy model has vectors
+        if self.nlp.meta.get('vectors', {}).get('width', 0) > 0:
+            # spaCy has vectors, use them
+            try:
+                similarity = req_doc.similarity(act_doc)
+                explanation = f"spaCy semantic: {similarity:.3f}"
+                return similarity, explanation
+            except Exception as e:
+                logger.warning(f"spaCy similarity error: {e}")
+        
+        # FINAL FALLBACK: Text-based similarity when no vectors available
+        similarity = self._compute_text_similarity(req_doc.text, act_doc.text)
+        explanation = f"Text-based similarity: {similarity:.3f}"
         return similarity, explanation    
     
     def compute_bm25_score(self, req_terms: List[str], act_terms: List[str], 
@@ -539,34 +493,63 @@ class AerospaceMatcher:
         return domain_score, explanation
     
     def expand_query_aerospace(self, query_terms: List[str], activity_terms: List[str]) -> Tuple[float, str]:
-        """ACTIVITY EXPANSION: Expand sparse activities to find requirement matches."""
+        """
+        UNIFIED: Query expansion using aerospace synonyms with activity expansion.
         
-        # Keep requirement terms as-is (no expansion)
-        req_terms_set = set(term.lower() for term in query_terms)
+        Strategy:
+        1. Expand activity terms with synonyms (helps sparse activities match requirements)
+        2. Calculate overlap between requirement terms and expanded activities
+        3. Score based on how well the expanded activity covers requirement terms
         
-        # Expand activity terms using domain synonyms
-        expanded_activity_terms = set(term.lower() for term in activity_terms)
+        Args:
+            query_terms: Terms extracted from requirement
+            activity_terms: Terms extracted from activity
+            
+        Returns:
+            Tuple of (score, explanation)
+        """
         
+        if not query_terms or not activity_terms:
+            return 0.0, "No terms to expand"
+        
+        # Normalize requirement terms
+        req_terms_set = set(term.lower().strip() for term in query_terms if term.strip())
+        
+        # Start with original activity terms
+        expanded_activity_terms = set(term.lower().strip() for term in activity_terms if term.strip())
+        
+        # Expand activity terms using domain resources
+        expansion_count = 0
         for term in activity_terms:
-            term_lower = term.lower()
-            synonyms = self.domain.get_synonyms(term_lower)
-            for synonym in synonyms:
-                expanded_activity_terms.add(synonym.lower())
+            term_lower = term.lower().strip()
+            if term_lower:
+                # Get synonyms from domain resources
+                synonyms = self.domain.get_synonyms(term_lower)
+                for synonym in synonyms:
+                    if synonym.strip():
+                        expanded_activity_terms.add(synonym.lower().strip())
+                        expansion_count += 1
         
         # Calculate overlap: requirement terms found in expanded activities
-        overlap = len(req_terms_set & expanded_activity_terms)
+        overlap_terms = req_terms_set & expanded_activity_terms
+        overlap_count = len(overlap_terms)
         
         # Score: What fraction of requirement terms are addressed by expanded activity?
-        score = overlap / len(req_terms_set) if req_terms_set else 0.0
+        score = overlap_count / len(req_terms_set) if req_terms_set else 0.0
         
-        # Create explanation
-        if overlap > 0:
-            matched_terms = list(req_terms_set & expanded_activity_terms)
-            explanation = f"Activity expansion: {overlap}/{len(req_terms_set)} req terms matched via [{', '.join(matched_terms)}]"
+        # Create detailed explanation
+        if overlap_count > 0:
+            matched_terms = list(overlap_terms)[:3]  # Show first 3 matches
+            explanation = f"Activity expansion: {overlap_count}/{len(req_terms_set)} req terms matched"
+            if expansion_count > 0:
+                explanation += f" (expanded {expansion_count} synonyms)"
+            explanation += f" via [{', '.join(matched_terms)}]"
         else:
             explanation = f"Activity expansion: 0/{len(req_terms_set)} req terms matched"
+            if expansion_count > 0:
+                explanation += f" (tried {expansion_count} synonyms)"
         
-        return score, explanation    
+        return score, explanation
     
     def compute_comprehensive_similarity(self, req_doc, act_doc, req_terms: List[str],
                                     act_terms: List[str], corpus_stats: Dict[str, Any],
@@ -665,10 +648,10 @@ class AerospaceMatcher:
         # Default aerospace-optimized weights
         if weights is None:
             weights = {
-                'semantic': 0.4,        # Moderate - general models struggle with aerospace
-                'bm25': 0.2,           # High - term matching crucial in technical domains
-                'domain': 0.1,         # High - aerospace terms are key
-                'query_expansion': 0.3  # Moderate - helps with sparse activities 
+                'semantic': 1,        # Moderate - general models struggle with aerospace
+                'bm25': 1,           # High - term matching crucial in technical domains
+                'domain': 1,         # High - aerospace terms are key
+                'query_expansion': 1  # Moderate - helps with sparse activities 
             }
             logger.info("🚀 Using aerospace-optimized weights")
         
@@ -760,7 +743,7 @@ class AerospaceMatcher:
                 )
                 
                 # Calculate combined score (unchanged)
-                combined_score = sum(weights.get(key, 0) * score for key, score in scores.items())
+                combined_score = sum(weights[key] * score for key, score in scores.items()) / sum(weights.values())
                 
                 if combined_score >= min_similarity:
                     activity_scores.append({
@@ -920,7 +903,6 @@ class AerospaceMatcher:
         print(f"  Average score: {avg_score:.3f}")
         print(f"  High-quality matches: {excellent_pct:.1f}%")
 
-
 def main():
     """Main execution function with simple evaluation."""
     print("="*70)
@@ -945,7 +927,6 @@ def main():
     
     # Create matcher
     matcher = AerospaceMatcher(repo_manager=repo_manager)
-    
     try:
         # Run matching (existing code)
         results_df = matcher.run_matching(
@@ -1037,7 +1018,7 @@ def main():
         dashboard_path = None
         try:
             print(f"\n🌐 Creating simple dashboard...")
-            # Import existing dashboard function (NO NEW NAMES)
+            # Import existing dashboard function
             from src.dashboard.simple_dashboard import create_simple_dashboard
             
             # Use existing create_simple_dashboard function (UNCHANGED SIGNATURE)

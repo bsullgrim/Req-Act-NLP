@@ -75,6 +75,10 @@ class DomainKnowledgeBuilder:
         self.vocabulary_mappings = {}
         self.phrase_patterns = {}
         self.entity_mappings = {}
+        
+        # ENHANCED: Add co-occurrence tracking
+        self.term_cooccurrence = defaultdict(Counter)
+        self.activity_name_patterns = Counter()
     
     def _find_manual_traces_file(self, filename: str) -> str:
         """Find manual traces file using project path resolution."""
@@ -159,6 +163,44 @@ class DomainKnowledgeBuilder:
             'domain_knowledge': domain_knowledge
         }
     
+    def _clean_activity_name(self, activity: str) -> str:
+        """Clean activity names by removing numbers and context annotations"""
+        # Remove context annotations
+        if '(context' in activity:
+            activity = activity.split('(context')[0].strip()
+        
+        # Remove numbering (e.g., "1.1.7 Monitor..." -> "Monitor...")
+        parts = activity.split()
+        if parts and re.match(r'^\d+(\.\d+)*$', parts[0]):
+            activity = ' '.join(parts[1:])
+        
+        return activity.strip()
+    
+    def _extract_meaningful_tokens(self, text: str) -> List[str]:
+        """Better token extraction with domain awareness"""
+        if not text:
+            return []
+        
+        # Remove special characters but keep hyphens and underscores
+        text = re.sub(r'[^\w\s\-_]', ' ', text)
+        
+        if self.nlp:
+            doc = self.nlp(text)
+            tokens = []
+            for token in doc:
+                if (not token.is_stop and 
+                    not token.is_punct and 
+                    len(token.text) > 2 and
+                    not token.text.lower() in {'shall', 'will', 'must'}):
+                    tokens.append(token.lemma_.lower())
+            return tokens
+        else:
+            # Fallback tokenization
+            tokens = text.split()
+            stopwords = {'the', 'and', 'or', 'shall', 'will', 'must', 'with', 
+                        'for', 'from', 'of', 'to', 'in', 'on', 'at', 'by', 'as'}
+            return [t.lower() for t in tokens if len(t) > 2 and t.lower() not in stopwords]
+    
     def _extract_vocabulary_patterns(self, traces_df: pd.DataFrame) -> Dict:
         """Extract vocabulary mappings between requirements and activities."""
         vocab_mappings = defaultdict(set)
@@ -172,45 +214,70 @@ class DomainKnowledgeBuilder:
             
             if not req_text.strip():
                 continue
-                
-            # Process requirement
-            req_doc = self.nlp(req_text.lower()) if self.nlp else None
-            if req_doc:
-                req_tokens = {token.lemma_ for token in req_doc 
-                             if not token.is_stop and token.is_alpha and len(token.text) > 2}
-            else:
-                # Fallback text processing
-                req_tokens = set(re.findall(r'\b[a-zA-Z]{3,}\b', req_text.lower()))
+            
+            # Enhanced tokenization
+            req_tokens = self._extract_meaningful_tokens(req_text.lower())
             
             # Process each linked activity
             for activity in activities:
                 activity = activity.strip()
                 if not activity:
                     continue
-                    
-                if self.nlp:
-                    act_doc = self.nlp(activity.lower())
-                    act_tokens = {token.lemma_ for token in act_doc 
-                                 if not token.is_stop and token.is_alpha and len(token.text) > 2}
-                else:
-                    act_tokens = set(re.findall(r'\b[a-zA-Z]{3,}\b', activity.lower()))
                 
-                # Find potential synonyms
+                # Clean activity name properly
+                activity_clean = self._clean_activity_name(activity)
+                act_tokens = self._extract_meaningful_tokens(activity_clean.lower())
+                
+                # Track co-occurrence for better synonym detection
                 for req_token in req_tokens:
                     for act_token in act_tokens:
-                        if req_token != act_token and self._are_semantically_similar(req_token, act_token):
-                            synonym_pairs.append((req_token, act_token))
-                            vocab_mappings[req_token].add(act_token)
+                        if req_token != act_token:
+                            self.term_cooccurrence[req_token][act_token] += 1
+                            
+                            # If they co-occur, they might be synonyms
+                            if self._are_semantically_similar(req_token, act_token):
+                                synonym_pairs.append((req_token, act_token))
+                                vocab_mappings[req_token].add(act_token)
         
         # Count synonym frequency
         synonym_freq = Counter(synonym_pairs)
         high_confidence_synonyms = {pair: count for pair, count in synonym_freq.items() if count >= 2}
         
+        # Add co-occurrence based synonyms
+        for term1, counter in self.term_cooccurrence.items():
+            for term2, count in counter.items():
+                if count >= 2 and term1 != term2:  # Co-occur at least 2 times (lowered threshold)
+                    vocab_mappings[term1].add(term2)
+                    vocab_mappings[term2].add(term1)
+        
+        # Extract co-occurrence synonyms
+        cooccurrence_synonyms = self._extract_cooccurrence_synonyms()
+        
         return {
             'vocabulary_mappings': {k: list(v) for k, v in vocab_mappings.items()},
             'synonym_pairs': high_confidence_synonyms,
-            'total_unique_terms': len(vocab_mappings)
+            'total_unique_terms': len(vocab_mappings),
+            'cooccurrence_synonyms': cooccurrence_synonyms
         }
+    
+    def _extract_cooccurrence_synonyms(self) -> Dict[str, List[str]]:
+        """Extract synonyms based on co-occurrence patterns"""
+        cooccurrence_synonyms = defaultdict(set)
+        
+        # Use the co-occurrence data we've been tracking
+        for term1, counter in self.term_cooccurrence.items():
+            # Get top co-occurring terms
+            top_cooccurring = sorted(counter.items(), key=lambda x: x[1], reverse=True)[:5]
+            
+            for term2, count in top_cooccurring:
+                if count >= 2 and term1 != term2:
+                    # Additional checks for quality
+                    if (len(term1) > 2 and len(term2) > 2 and
+                        not term1.isdigit() and not term2.isdigit()):
+                        cooccurrence_synonyms[term1].add(term2)
+                        cooccurrence_synonyms[term2].add(term1)
+        
+        return {term: list(synonyms) for term, synonyms in cooccurrence_synonyms.items()}
     
     def _extract_phrase_patterns(self, traces_df: pd.DataFrame) -> Dict:
         """Extract common phrase patterns in successful matches."""
@@ -241,9 +308,12 @@ class DomainKnowledgeBuilder:
                 activity = activity.strip()
                 if not activity:
                     continue
-                    
+                
+                # Clean activity name
+                activity_clean = self._clean_activity_name(activity)
+                
                 if self.nlp:
-                    act_doc = self.nlp(activity)
+                    act_doc = self.nlp(activity_clean)
                     for chunk in act_doc.noun_chunks:
                         if len(chunk.text.split()) <= 3:
                             phrase_patterns['activity_patterns'][chunk.text.lower().strip()] += 1
@@ -279,8 +349,9 @@ class DomainKnowledgeBuilder:
                 activity = activity.strip()
                 if not activity:
                     continue
-                    
-                act_doc = self.nlp(activity)
+                
+                activity_clean = self._clean_activity_name(activity)
+                act_doc = self.nlp(activity_clean)
                 act_entities = {(ent.text.lower(), ent.label_) for ent in act_doc.ents}
                 
                 # Map entities of same type
@@ -345,8 +416,9 @@ class DomainKnowledgeBuilder:
                 activity = activity.strip()
                 if not activity:
                     continue
-                    
-                act_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', activity.lower()))
+                
+                activity_clean = self._clean_activity_name(activity)
+                act_words = set(re.findall(r'\b[a-zA-Z]{3,}\b', activity_clean.lower()))
                 
                 # Shared words are strong indicators
                 shared_words = req_words & act_words
@@ -362,23 +434,9 @@ class DomainKnowledgeBuilder:
     
     def _are_semantically_similar(self, word1: str, word2: str, threshold: float = 0.3) -> bool:
         """Check if two words are semantically similar using spaCy vectors."""
-        if not self.nlp:
-            # Fallback: simple character similarity
-            if abs(len(word1) - len(word2)) > 3:
-                return False
-            common_chars = set(word1) & set(word2)
-            return len(common_chars) >= 3
-        
-        try:
-            token1 = self.nlp(word1)[0]
-            token2 = self.nlp(word2)[0]
-            
-            if token1.has_vector and token2.has_vector:
-                similarity = token1.similarity(token2)
-                return similarity > threshold
-        except:
-            pass
-        return False
+        # FIXED: For domain knowledge building, accept all co-occurrences as potential synonyms
+        # The frequency filtering will handle quality control
+        return word1 != word2 and len(word1) > 2 and len(word2) > 2
     
     def _simple_text_similarity(self, text1: str, text2: str) -> float:
         """Simple text similarity without external dependencies."""
@@ -396,17 +454,23 @@ class DomainKnowledgeBuilder:
     def save_domain_knowledge(self, domain_knowledge: Dict, output_file: str = "domain_knowledge.json"):
         """Save extracted domain knowledge to file."""
         # Convert Counter objects to regular dicts for JSON serialization
-        def convert_counters(obj):
+        def convert_for_json(obj):
             if isinstance(obj, Counter):
                 return dict(obj)
             elif isinstance(obj, dict):
-                return {k: convert_counters(v) for k, v in obj.items()}
+                # Check if keys are tuples (like synonym_pairs)
+                if any(isinstance(k, tuple) for k in obj.keys()):
+                    # Convert tuple keys to strings
+                    return {f"{k[0]}->{k[1]}" if isinstance(k, tuple) else k: v 
+                           for k, v in obj.items()}
+                else:
+                    return {k: convert_for_json(v) for k, v in obj.items()}
             elif isinstance(obj, list):
-                return [convert_counters(item) for item in obj]
+                return [convert_for_json(item) for item in obj]
             else:
                 return obj
         
-        serializable_knowledge = convert_counters(domain_knowledge)
+        serializable_knowledge = convert_for_json(domain_knowledge)
         
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(serializable_knowledge, f, indent=2, ensure_ascii=False)
@@ -434,7 +498,32 @@ class DomainKnowledgeBuilder:
                 if similar_term not in synonyms[term]:
                     synonyms[term].append(similar_term)
         
-        return synonyms
+        # ENHANCED: Add co-occurrence based synonyms
+        cooccurrence_syns = domain_knowledge.get('domain_knowledge', {}).get('vocabulary', {}).get('cooccurrence_synonyms', {})
+        for term, syns in cooccurrence_syns.items():
+            if term not in synonyms:
+                synonyms[term] = syns
+            else:
+                for syn in syns:
+                    if syn not in synonyms[term]:
+                        synonyms[term].append(syn)
+        
+        # CRITICAL: Ensure bidirectional synonyms for query expansion
+        bidirectional_synonyms = {}
+        for term, syns in synonyms.items():
+            if term not in bidirectional_synonyms:
+                bidirectional_synonyms[term] = list(syns)
+            
+            # Make sure reverse mappings exist
+            for syn in syns:
+                if syn not in bidirectional_synonyms:
+                    bidirectional_synonyms[syn] = []
+                if term not in bidirectional_synonyms[syn]:
+                    bidirectional_synonyms[syn].append(term)
+        
+        print(f"✅ Created bidirectional synonyms for {len(bidirectional_synonyms)} terms")
+        
+        return bidirectional_synonyms
 
 
 # Main function
@@ -459,15 +548,36 @@ def main():
         print(f"  Unique requirements: {stats['unique_requirements']}")
         print(f"  Unique activities: {stats['unique_activities']}")
         
+        # Print vocabulary extraction results
+        vocab = knowledge.get('vocabulary', {})
+        print(f"\nVocabulary Extraction:")
+        print(f"  Vocabulary mappings: {vocab.get('total_unique_terms', 0)} terms")
+        print(f"  High-confidence synonym pairs: {len(vocab.get('synonym_pairs', {}))}")
+        print(f"  Co-occurrence synonyms: {len(vocab.get('cooccurrence_synonyms', {}))}")
+        
         # Save domain knowledge
         builder.save_domain_knowledge(domain_analysis, "extracted_domain_knowledge.json")
         
         # Create enhanced synonyms
         enhanced_synonyms = builder.create_enhanced_synonyms(domain_analysis)
-        with open("enhanced_synonyms.json", 'w') as f:
+        
+        # Create domain_knowledge directory if it doesn't exist
+        domain_knowledge_dir = Path("resources/aerospace/domain_knowledge")
+        domain_knowledge_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save to domain_knowledge folder
+        with open(domain_knowledge_dir / "learned_synonyms.json", 'w') as f:
             json.dump(enhanced_synonyms, f, indent=2)
         
         print(f"\nEnhanced synonym dictionary created with {len(enhanced_synonyms)} terms")
+        print(f"Saved to: {domain_knowledge_dir / 'learned_synonyms.json'}")
+        
+        # Show some examples
+        print("\nExample synonym mappings extracted:")
+        examples = ['monitor', 'measure', 'fiber', 'quality', 'control']
+        for term in examples:
+            if term in enhanced_synonyms:
+                print(f"  '{term}' → {enhanced_synonyms[term][:5]}{'...' if len(enhanced_synonyms[term]) > 5 else ''}")
         
     except FileNotFoundError as e:
         print(f"\n❌ File not found: {e}")

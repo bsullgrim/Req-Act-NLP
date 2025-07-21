@@ -1,6 +1,6 @@
 """
 Domain Resources - Manage aerospace vocabulary and term expansion
-Loads external JSON files instead of hardcoded dictionaries
+Loads external JSON files with fallback to baseline resources
 """
 
 import json
@@ -14,43 +14,84 @@ class DomainResources:
     """Manages domain vocabulary and term expansion from external resources."""
     
     def __init__(self, domain_path: str = "resources/aerospace"):
-        """
-        Initialize with domain resource files.
-        
-        Args:
-            domain_path: Path to domain resource directory
-        """
+        """Initialize with domain resource files."""
         self.domain_path = Path(domain_path)
+        self.domain_knowledge_path = self.domain_path / "domain_knowledge"
+        
+        # Initialize empty containers
         self.vocabulary = {}
         self.synonyms = {}
         self.abbreviations = {}
         
-        # Load all resources
+        # Load all resources with fallback logic
         self._load_resources()
         
-        logger.info(f"✅ Loaded domain resources from {domain_path}")
-        logger.info(f"   📚 Vocabulary categories: {len(self.vocabulary)}")
-        logger.info(f"   🔗 Synonym entries: {len(self.synonyms)}")
-        logger.info(f"   📝 Abbreviations: {len(self.abbreviations)}")
+        # Verify critical functionality
+        self._verify_functionality()
+        
+        logger.info(f"✅ Domain resources loaded from {domain_path}")
     
     def _load_resources(self):
-        """Load all JSON resource files."""
+        """Load all JSON resource files with fallback logic."""
         try:
-            # Load all resources from resources/aerospace/ directory
-            self.vocabulary = self._load_json("vocabulary.json")
-            self.synonyms = self._load_json("synonyms.json")  # Use our extracted aerospace synonyms
-            self.abbreviations = self._load_json("abbreviations.json")
-                
+            # 1. Load vocabulary (baseline only for now)
+            self.vocabulary = self._load_json("vocabulary.json", use_enhanced=False)
+            
+            # 2. Load synonyms with fallback
+            self.synonyms = self._load_json_with_fallback("synonyms.json", "learned_synonyms.json")
+            
+            # 3. Load abbreviations (baseline only for now)
+            self.abbreviations = self._load_json("abbreviations.json", use_enhanced=False)
+            
+            # Log loading success
+            logger.info(f"📚 Loaded {len(self.vocabulary)} vocabulary categories")
+            logger.info(f"🔗 Loaded {len(self.synonyms)} synonym entries")
+            logger.info(f"📝 Loaded {len(self.abbreviations)} abbreviations")
+            
+            # Log which resources are enhanced vs baseline
+            if (self.domain_knowledge_path / "learned_synonyms.json").exists():
+                enhanced_path = self.domain_knowledge_path / "learned_synonyms.json"
+                try:
+                    with open(enhanced_path, 'r', encoding='utf-8') as f:
+                        enhanced_data = json.load(f)
+                        if enhanced_data:  # Not empty
+                            logger.info("✨ Using ENHANCED synonyms from domain knowledge")
+                        else:
+                            logger.info("📋 Using baseline synonyms (enhanced file empty)")
+                except:
+                    logger.info("📋 Using baseline synonyms")
+            else:
+                logger.info("📋 Using baseline synonyms (no enhanced version)")
+            
         except Exception as e:
             logger.error(f"❌ Failed to load domain resources: {e}")
-            # Fall back to empty dictionaries
-            self.vocabulary = {}
-            self.synonyms = {}
-            self.abbreviations = {}
+            # Fallback to minimal hardcoded resources
+            self._create_fallback_resources()
     
-    def _load_json(self, filename: str) -> Dict:
+    def _load_json_with_fallback(self, baseline_filename: str, enhanced_filename: str) -> Dict:
+        """Load JSON with fallback: try enhanced first, then baseline."""
+        # Try enhanced version first
+        enhanced_path = self.domain_knowledge_path / enhanced_filename
+        if enhanced_path.exists():
+            try:
+                with open(enhanced_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    if data:  # Not empty
+                        logger.debug(f"✅ Loaded enhanced {enhanced_filename}: {len(data)} entries")
+                        return data
+            except Exception as e:
+                logger.warning(f"⚠️ Could not load enhanced {enhanced_filename}: {e}")
+        
+        # Fallback to baseline
+        return self._load_json(baseline_filename, use_enhanced=False)
+    
+    def _load_json(self, filename: str, use_enhanced: bool = True) -> Dict:
         """Load a JSON file from the domain path."""
-        file_path = self.domain_path / filename
+        # Determine path
+        if use_enhanced and (self.domain_knowledge_path / filename).exists():
+            file_path = self.domain_knowledge_path / filename
+        else:
+            file_path = self.domain_path / filename
         
         if not file_path.exists():
             logger.warning(f"⚠️ Resource file not found: {file_path}")
@@ -59,110 +100,160 @@ class DomainResources:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                logger.debug(f"✅ Loaded {filename}: {len(data)} entries")
+                logger.debug(f"✅ Loaded {filename}: {len(data)} entries from {file_path.parent.name}")
                 return data
         except Exception as e:
             logger.error(f"❌ Failed to load {filename}: {e}")
             return {}
     
-    def get_domain_terms(self, category: Optional[str] = None) -> Set[str]:
-        """
-        Get domain vocabulary terms.
+    def _create_fallback_resources(self):
+        """Create minimal fallback resources if files can't be loaded."""
+        logger.warning("🔄 Using fallback resources...")
         
-        Args:
-            category: Optional category filter (e.g., 'systems', 'operations')
-            
-        Returns:
-            Set of domain terms
-        """
+        self.synonyms = {
+            "monitor": ["track", "observe", "watch"],
+            "control": ["manage", "regulate", "command"],
+            "transmit": ["send", "broadcast", "relay"],
+            "receive": ["acquire", "capture", "obtain"],
+            "system": ["subsystem", "component", "module"]
+        }
+        
+        self.abbreviations = {
+            "acs": "attitude control system",
+            "comm": "communication",
+            "nav": "navigation",
+            "cmd": "command"
+        }
+        
+        self.vocabulary = {
+            "systems": ["system", "subsystem", "component"],
+            "operations": ["monitor", "control", "transmit", "receive"]
+        }
+
+    def _verify_functionality(self):
+        """Verify that expand_terms will work correctly."""
+        test_terms = ["monitor", "control", "system"]
+        expanded = self.expand_terms(test_terms)
+        
+        if len(expanded) <= len(test_terms):
+            logger.warning(f"⚠️ expand_terms() not expanding: {test_terms} → {expanded}")
+        else:
+            logger.info(f"✅ expand_terms() working: {len(test_terms)} → {len(expanded)} terms")
+    
+    def get_resource_status(self) -> Dict[str, str]:
+        """Get status of which resources are being used."""
+        status = {}
+        
+        # Check synonyms
+        enhanced_synonyms_path = self.domain_knowledge_path / "learned_synonyms.json"
+        if enhanced_synonyms_path.exists():
+            try:
+                with open(enhanced_synonyms_path, 'r') as f:
+                    data = json.load(f)
+                    if data:
+                        status['synonyms'] = f"Enhanced ({len(data)} terms)"
+                    else:
+                        status['synonyms'] = "Baseline (enhanced file empty)"
+            except:
+                status['synonyms'] = "Baseline (enhanced file error)"
+        else:
+            status['synonyms'] = "Baseline (no enhanced file)"
+        
+        status['vocabulary'] = f"Baseline ({len(self.vocabulary)} categories)"
+        status['abbreviations'] = f"Baseline ({len(self.abbreviations)} terms)"
+        
+        return status
+    
+    # [Keep all other methods unchanged - expand_terms, get_synonyms, etc.]
+    
+    def get_domain_terms(self, category: Optional[str] = None) -> Set[str]:
+        """Get domain vocabulary terms."""
         if category and category in self.vocabulary:
             return set(self.vocabulary[category])
         
         # Return all terms from all categories
         all_terms = set()
         for category_terms in self.vocabulary.values():
-            all_terms.update(category_terms)
-        
+            if isinstance(category_terms, list):
+                all_terms.update(category_terms)
         return all_terms
     
     def expand_terms(self, terms: List[str]) -> List[str]:
         """
-        Expand terms with synonyms and abbreviations.
+        CRITICAL FIX: Expand terms with synonyms and abbreviations.
+        This method is called by matcher.py expand_query_aerospace()
         
         Args:
             terms: List of terms to expand
             
         Returns:
             Original terms plus all expansions (unique)
-            
-        Example:
-            Input: ['acs', 'monitor']
-            Output: ['acs', 'attitude control system', 'monitor', 'track', 'observe']
         """
-        expanded = set(terms)  # Start with original terms
+        if not terms:
+            return []
         
+        expanded = set()
+        
+        # Add original terms
         for term in terms:
-            term_lower = term.lower()
+            if term and term.strip():
+                expanded.add(term.lower().strip())
+        
+        # Expand each term
+        for term in terms:
+            if not term or not term.strip():
+                continue
+                
+            term_lower = term.lower().strip()
             
             # Expand abbreviations
             if term_lower in self.abbreviations:
-                expanded.add(self.abbreviations[term_lower])
-                logger.debug(f"🔤 Expanded abbrev '{term}' → '{self.abbreviations[term_lower]}'")
+                full_form = self.abbreviations[term_lower]
+                if full_form and full_form.strip():
+                    expanded.add(full_form.strip())
+                    logger.debug(f"🔤 Expanded abbrev '{term}' → '{full_form}'")
             
             # Expand synonyms
             if term_lower in self.synonyms:
-                for synonym in self.synonyms[term_lower]:
-                    expanded.add(synonym)
-                logger.debug(f"🔗 Added synonyms for '{term}': {self.synonyms[term_lower]}")
+                synonyms = self.synonyms[term_lower]
+                if synonyms and isinstance(synonyms, list):
+                    for synonym in synonyms:
+                        if synonym and synonym.strip():
+                            expanded.add(synonym.strip())
+                    logger.debug(f"🔗 Added {len(synonyms)} synonyms for '{term}'")
         
         result = list(expanded)
-        logger.debug(f"📈 Expanded {len(terms)} terms to {len(result)} terms")
-        return result
-    
-    def get_abbreviation(self, abbrev: str) -> Optional[str]:
-        """
-        Get full form of abbreviation.
         
-        Args:
-            abbrev: Abbreviation to expand
-            
-        Returns:
-            Full form or None if not found
-        """
-        return self.abbreviations.get(abbrev.lower())
+        # Log expansion results
+        if len(result) > len(terms):
+            logger.debug(f"📈 Successfully expanded {len(terms)} → {len(result)} terms")
+        else:
+            logger.warning(f"⚠️ No expansion: {terms} → {result}")
+        
+        return result
+        
+    def get_abbreviation(self, abbrev: str) -> Optional[str]:
+        """Get full form of abbreviation."""
+        if not abbrev:
+            return None
+        return self.abbreviations.get(abbrev.lower().strip())
     
     def get_synonyms(self, term: str) -> List[str]:
-        """
-        Get synonyms for a term.
-        
-        Args:
-            term: Term to find synonyms for
-            
-        Returns:
-            List of synonyms (empty if none found)
-        """
-        return self.synonyms.get(term.lower(), [])
+        """Get synonyms for a term."""
+        if not term:
+            return []
+        synonyms = self.synonyms.get(term.lower().strip(), [])
+        return synonyms if isinstance(synonyms, list) else []
     
     def is_domain_term(self, term: str) -> bool:
-        """
-        Check if a term is in the domain vocabulary.
-        
-        Args:
-            term: Term to check
-            
-        Returns:
-            True if term is in any vocabulary category
-        """
-        term_lower = term.lower()
+        """Check if a term is in the domain vocabulary."""
+        if not term:
+            return False
+        term_lower = term.lower().strip()
         return term_lower in self.get_domain_terms()
     
     def get_vocabulary_stats(self) -> Dict[str, int]:
-        """
-        Get statistics about loaded vocabulary.
-        
-        Returns:
-            Dictionary with vocabulary statistics
-        """
+        """Get statistics about loaded vocabulary."""
         stats = {
             'total_categories': len(self.vocabulary),
             'total_terms': len(self.get_domain_terms()),
@@ -172,7 +263,8 @@ class DomainResources:
         
         # Add per-category counts
         for category, terms in self.vocabulary.items():
-            stats[f'{category}_terms'] = len(terms)
+            if isinstance(terms, list):
+                stats[f'{category}_terms'] = len(terms)
         
         return stats
     
@@ -181,65 +273,65 @@ class DomainResources:
         logger.info("🔄 Reloading domain resources...")
         self._load_resources()
 
+    def test_expand_terms(self, test_terms: List[str] = None) -> Dict:
+        """Test expand_terms functionality and return diagnostics."""
+        if test_terms is None:
+            test_terms = ["monitor", "control", "acs", "transmit", "system"]
+        
+        print(f"🧪 Testing expand_terms() with: {test_terms}")
+        
+        expanded = self.expand_terms(test_terms)
+        
+        diagnostics = {
+            'input_terms': test_terms,
+            'input_count': len(test_terms),
+            'output_terms': expanded,
+            'output_count': len(expanded),
+            'expansion_ratio': len(expanded) / len(test_terms) if test_terms else 0,
+            'working': len(expanded) > len(test_terms),
+            'added_terms': [term for term in expanded if term not in [t.lower() for t in test_terms]]
+        }
+        
+        print(f"📊 Results:")
+        print(f"   Input: {test_terms} ({len(test_terms)} terms)")
+        print(f"   Output: {expanded} ({len(expanded)} terms)")
+        print(f"   Expansion ratio: {diagnostics['expansion_ratio']:.1f}x")
+        print(f"   Working: {'✅ YES' if diagnostics['working'] else '❌ NO'}")
+        print(f"   Added terms: {diagnostics['added_terms']}")
+        
+        # Show resource status
+        print(f"\n📁 Resource Status:")
+        status = self.get_resource_status()
+        for resource, info in status.items():
+            print(f"   {resource}: {info}")
+        
+        return diagnostics
 
 def test_domain_resources():
-    """Test function to verify domain resources work correctly."""
-    print("🧪 Testing Domain Resources (Lightweight Aerospace Focus)...")
+    """Test the domain resources thoroughly."""
+    print("🚀 COMPREHENSIVE DOMAIN RESOURCES TEST")
+    print("=" * 60)
     
-    # Initialize
-    resources = DomainResources()
-    
-    # Test vocabulary
-    system_terms = resources.get_domain_terms('systems')
-    print(f"✅ System terms: {len(system_terms)} (sample: {list(system_terms)[:5]})")
-    
-    all_terms = resources.get_domain_terms()
-    print(f"✅ Total domain terms: {len(all_terms)}")
-    
-    # Test abbreviation expansion
-    acs_expansion = resources.get_abbreviation('acs')
-    print(f"✅ ACS expansion: '{acs_expansion}'")
-    
-    # Test synonym expansion - key aerospace terms
-    test_synonyms = ['monitor', 'transmit', 'control', 'system']
-    for term in test_synonyms:
-        synonyms = resources.get_synonyms(term)
-        print(f"✅ {term} synonyms: {synonyms}")
-    
-    # Test term expansion (the KEY method for fixing query expansion!)
-    test_terms = ['monitor', 'acs', 'transmit', 'system']
-    expanded = resources.expand_terms(test_terms)
-    print(f"\n🎯 CRITICAL TEST - Term expansion:")
-    print(f"   Input: {test_terms} ({len(test_terms)} terms)")
-    print(f"   Output: {expanded} ({len(expanded)} terms)")
-    print(f"   Expansion ratio: {len(expanded)/len(test_terms):.1f}x")
-    
-    # Verify this returns meaningful results (not empty!)
-    if len(expanded) > len(test_terms):
-        print(f"🎉 SUCCESS: expand_terms() working correctly!")
-        print(f"   Expansion adds {len(expanded) - len(test_terms)} synonym terms")
-        print(f"   This will fix the broken query expansion in matcher.py")
+    # Test with default path
+    try:
+        resources = DomainResources()
+        stats = resources.get_vocabulary_stats()
+        print(f"📊 Vocabulary stats: {stats}")
         
-        # Test expected score impact
-        sample_activity_terms = ['track', 'temperature', 'send', 'data', 'subsystem']
-        overlap = len(set(expanded) & set(sample_activity_terms))
-        score = overlap / len(expanded)
-        print(f"   Sample score with activity terms: {overlap}/{len(expanded)} = {score:.3f}")
+        # Test expand_terms (THE CRITICAL METHOD)
+        test_result = resources.test_expand_terms()
         
-        if score > 0.15:
-            print(f"   🚀 Score looks meaningful for 10% query expansion weight!")
+        return test_result['working']
         
-    else:
-        print(f"⚠️  WARNING: No expansion occurred - check resource loading")
-    
-    # Test statistics
-    stats = resources.get_vocabulary_stats()
-    print(f"\n📊 Vocabulary stats: {stats}")
-    
-    print(f"\n✅ Lightweight aerospace synonyms: {len(resources.synonyms)} terms")
-    print(f"🎯 Perfect for surgical query expansion fix!")
-    print("🔧 Ready to integrate with matcher.py!")
-
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return False
 
 if __name__ == "__main__":
-    test_domain_resources()
+    working = test_domain_resources()
+    if working:
+        print(f"\n🎉 SUCCESS: Domain resources working correctly!")
+        print(f"🎯 expand_terms() will fix query expansion in matcher.py")
+    else:
+        print(f"\n❌ FAILURE: Domain resources need fixing")
+        print(f"💡 Check resource files in resources/aerospace/")
