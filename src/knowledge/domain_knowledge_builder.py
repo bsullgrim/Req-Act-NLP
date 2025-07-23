@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class DomainKnowledgeBuilder:
     """Extract domain knowledge from existing manual requirement-activity traces."""
     
-    def __init__(self, spacy_model: str = "en_core_web_trf"):
+    def __init__(self, spacy_model: str = "en_core_web_lg"):
         # Initialize spaCy with fallback models
         try:
             self.nlp = spacy.load(spacy_model)
@@ -246,9 +246,11 @@ class DomainKnowledgeBuilder:
         # Add co-occurrence based synonyms
         for term1, counter in self.term_cooccurrence.items():
             for term2, count in counter.items():
-                if count >= 2 and term1 != term2:  # Co-occur at least 2 times (lowered threshold)
-                    vocab_mappings[term1].add(term2)
-                    vocab_mappings[term2].add(term1)
+                if count >= 3 and term1 != term2:  # Co-occur at least 3 times
+                    # Only add if they're actually similar
+                    if self._are_semantically_similar(term1, term2):
+                        vocab_mappings[term1].add(term2)
+                        vocab_mappings[term2].add(term1)
         
         # Extract co-occurrence synonyms
         cooccurrence_synonyms = self._extract_cooccurrence_synonyms()
@@ -434,9 +436,48 @@ class DomainKnowledgeBuilder:
     
     def _are_semantically_similar(self, word1: str, word2: str, threshold: float = 0.3) -> bool:
         """Check if two words are semantically similar using spaCy vectors."""
-        # FIXED: For domain knowledge building, accept all co-occurrences as potential synonyms
-        # The frequency filtering will handle quality control
-        return word1 != word2 and len(word1) > 2 and len(word2) > 2
+        # Don't accept just any co-occurrence - check for actual similarity
+        if word1 == word2:
+            return False
+            
+        # Check for common synonym patterns in aerospace domain
+        synonym_patterns = [
+            ('monitor', 'measure'), ('monitor', 'observe'), ('monitor', 'track'),
+            ('transmit', 'send'), ('transmit', 'broadcast'), ('transmit', 'relay'),
+            ('receive', 'acquire'), ('receive', 'capture'), ('receive', 'obtain'),
+            ('control', 'manage'), ('control', 'regulate'), ('control', 'command'),
+            ('fiber', 'optical'), ('fiber', 'zblan'),
+            ('quality', 'performance'), ('quality', 'characteristic'),
+            ('temperature', 'thermal'), ('temperature', 'heat'),
+            ('process', 'procedure'), ('process', 'operation'),
+            ('detect', 'identify'), ('detect', 'sense'),
+            ('maintain', 'sustain'), ('maintain', 'preserve')
+        ]
+        
+        # Check if it's a known synonym pair
+        for syn1, syn2 in synonym_patterns:
+            if (word1 == syn1 and word2 == syn2) or (word1 == syn2 and word2 == syn1):
+                return True
+        
+        # Check if they share word stems (e.g., transmit/transmission)
+        if len(word1) > 4 and len(word2) > 4:
+            if word1[:4] == word2[:4]:  # Common prefix
+                return True
+        
+        # If spaCy model available, use vector similarity
+        if self.nlp:
+            try:
+                token1 = self.nlp(word1)[0]
+                token2 = self.nlp(word2)[0]
+                
+                if token1.has_vector and token2.has_vector:
+                    similarity = token1.similarity(token2)
+                    return similarity > threshold
+            except:
+                pass
+        
+        # Default: only accept if co-occurrence is very high (handled by frequency threshold)
+        return False
     
     def _simple_text_similarity(self, text1: str, text2: str) -> float:
         """Simple text similarity without external dependencies."""
@@ -556,21 +597,21 @@ def main():
         print(f"  Co-occurrence synonyms: {len(vocab.get('cooccurrence_synonyms', {}))}")
         
         # Save domain knowledge
-        builder.save_domain_knowledge(domain_analysis, "extracted_domain_knowledge.json")
+        domain_knowledge_path = Path("resources/aerospace/domain_knowledge")
+        domain_knowledge_path.mkdir(parents=True, exist_ok=True)
+        
+        extracted_knowledge_file = domain_knowledge_path / "extracted_domain_knowledge.json"
+        builder.save_domain_knowledge(domain_analysis, str(extracted_knowledge_file))
         
         # Create enhanced synonyms
         enhanced_synonyms = builder.create_enhanced_synonyms(domain_analysis)
         
-        # Create domain_knowledge directory if it doesn't exist
-        domain_knowledge_dir = Path("resources/aerospace/domain_knowledge")
-        domain_knowledge_dir.mkdir(parents=True, exist_ok=True)
-        
         # Save to domain_knowledge folder
-        with open(domain_knowledge_dir / "learned_synonyms.json", 'w') as f:
+        with open(domain_knowledge_path / "learned_synonyms.json", 'w') as f:
             json.dump(enhanced_synonyms, f, indent=2)
         
         print(f"\nEnhanced synonym dictionary created with {len(enhanced_synonyms)} terms")
-        print(f"Saved to: {domain_knowledge_dir / 'learned_synonyms.json'}")
+        print(f"Saved to: {domain_knowledge_path / 'learned_synonyms.json'}")
         
         # Show some examples
         print("\nExample synonym mappings extracted:")

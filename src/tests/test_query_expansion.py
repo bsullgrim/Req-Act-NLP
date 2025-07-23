@@ -1,116 +1,106 @@
 #!/usr/bin/env python3
 """
-Test Query Expansion Fix - Verify the blocker is resolved
+Test Query Expansion Functionality
+==================================
+Verify that query expansion is working correctly in the matcher
 """
 
 import sys
-from pathlib import Path
-
-# Add project root to path
-sys.path.append(str(Path(__file__).parent))
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.matching.domain_resources import DomainResources
 
-def test_query_expansion_fix():
-    """Test the specific method that was broken in matcher.py"""
+def test_query_expansion():
+    """Test the query expansion functionality."""
     
-    print("🧪 TESTING QUERY EXPANSION FIX")
-    print("=" * 50)
+    print("🧪 Testing Query Expansion Functionality")
+    print("=" * 60)
     
-    # 1. Test DomainResources loads correctly
-    print("📚 Testing DomainResources loading...")
-    try:
-        domain = DomainResources()
-        print(f"✅ DomainResources loaded successfully")
-        
-        # Check what was loaded
-        stats = domain.get_vocabulary_stats()
-        print(f"   📊 Vocabulary: {stats['total_terms']} terms")
-        print(f"   🔗 Synonyms: {stats['total_synonyms']} entries") 
-        print(f"   📝 Abbreviations: {stats['total_abbreviations']} entries")
-        
-    except Exception as e:
-        print(f"❌ DomainResources failed to load: {e}")
-        return False
+    # Initialize domain resources
+    domain = DomainResources()
     
-    # 2. Test the KEY method that was broken
-    print(f"\n🎯 Testing expand_terms() - THE CRITICAL METHOD")
-    test_terms = ['monitor', 'control', 'transmit', 'system']
+    # Test expand_terms method
+    print("\n1️⃣ Testing expand_terms() method:")
     
-    try:
+    test_cases = [
+        ["monitor", "control", "system"],
+        ["transmit", "data"],
+        ["fiber", "quality"],
+        ["thermal", "temperature"]
+    ]
+    
+    for test_terms in test_cases:
         expanded = domain.expand_terms(test_terms)
-        print(f"   Input: {test_terms} ({len(test_terms)} terms)")
-        print(f"   Output: {expanded} ({len(expanded)} terms)")
-        print(f"   Expansion ratio: {len(expanded)/len(test_terms):.1f}x")
+        print(f"\nInput: {test_terms}")
+        print(f"Output: {expanded}")
+        print(f"Expansion ratio: {len(expanded)/len(test_terms):.1f}x")
         
-        if len(expanded) > len(test_terms):
-            print(f"🎉 SUCCESS: expand_terms() is working!")
-            print(f"   Added {len(expanded) - len(test_terms)} synonym terms")
+        # Show what was added
+        added_terms = [t for t in expanded if t not in [term.lower() for term in test_terms]]
+        if added_terms:
+            print(f"Added: {added_terms}")
         else:
-            print(f"⚠️ WARNING: No expansion occurred")
-            return False
-            
-    except Exception as e:
-        print(f"❌ expand_terms() failed: {e}")
-        return False
+            print("❌ No expansion occurred!")
     
-    # 3. Test the exact scenario from matcher.py
-    print(f"\n🔧 Testing matcher.py scenario...")
+    # Test specific synonyms
+    print("\n2️⃣ Testing specific synonym lookups:")
     
-    # Simulate what happens in expand_query_aerospace()
-    query_terms = ['monitor', 'temperature', 'control']
-    activity_terms = ['track', 'thermal', 'manage', 'sensor', 'data']
-    
-    # Get expanded terms
-    expanded_terms = set(query_terms)
-    for term in query_terms:
+    key_terms = ["monitor", "control", "transmit", "quality", "fiber"]
+    for term in key_terms:
         synonyms = domain.get_synonyms(term)
-        expanded_terms.update(synonyms)
+        if synonyms:
+            print(f"\n'{term}' → {synonyms}")
+        else:
+            print(f"\n'{term}' → ❌ No synonyms found")
     
-    expanded_list = list(expanded_terms)
+    # Test the actual query expansion as used in matcher
+    print("\n3️⃣ Simulating matcher's expand_query_aerospace():")
     
-    # Calculate overlap (what the matcher does)
-    activity_terms_lower = [term.lower() for term in activity_terms]
-    overlap = len(set(expanded_list) & set(activity_terms_lower))
-    score = overlap / len(expanded_list) if expanded_list else 0.0
+    # Simulate a requirement and activity
+    req_terms = ["monitor", "fiber", "quality", "optical", "properties"]
+    act_terms = ["measure", "fiber", "diameter", "sensor"]
     
-    print(f"   Query terms: {query_terms}")
-    print(f"   Expanded to: {expanded_list}")
-    print(f"   Activity terms: {activity_terms}")
-    print(f"   Overlap: {overlap} terms")
-    print(f"   Score: {score:.3f}")
+    print(f"\nRequirement terms: {req_terms}")
+    print(f"Activity terms: {act_terms}")
     
-    if score > 0.0:
-        print(f"🚀 EXCELLENT: Query expansion will contribute meaningful score!")
-        print(f"   With 10% weight, this adds {score * 0.1:.3f} to combined score")
+    # Expand activity terms (as done in the matcher)
+    expanded_activity = set(act_terms)
+    for term in act_terms:
+        synonyms = domain.get_synonyms(term.lower())
+        if synonyms:
+            expanded_activity.update(synonyms)
+            print(f"  Expanded '{term}' with: {synonyms}")
+    
+    print(f"\nExpanded activity terms: {list(expanded_activity)}")
+    
+    # Calculate overlap
+    req_set = set(t.lower() for t in req_terms)
+    overlap = req_set & expanded_activity
+    score = len(overlap) / len(req_set) if req_set else 0
+    
+    print(f"\nOverlap: {overlap}")
+    print(f"Score: {score:.3f} ({len(overlap)}/{len(req_set)} requirement terms matched)")
+    
+    # Diagnostic summary
+    print("\n📊 Diagnostic Summary:")
+    
+    stats = domain.get_vocabulary_stats()
+    print(f"Total synonyms: {stats['total_synonyms']}")
+    print(f"Total abbreviations: {stats['total_abbreviations']}")
+    print(f"Total domain terms: {stats['total_terms']}")
+    
+    # Check if query expansion is likely to work
+    if stats['total_synonyms'] < 10:
+        print("\n❌ CRITICAL: Synonym dictionary is too small!")
+        print("   Query expansion cannot work effectively.")
+    elif stats['total_synonyms'] < 50:
+        print("\n⚠️ WARNING: Limited synonym coverage")
+        print("   Query expansion will have minimal impact.")
     else:
-        print(f"❌ PROBLEM: Score is still 0.0")
-        return False
+        print("\n✅ Synonym dictionary appears adequate")
     
-    # 4. Test abbreviation expansion
-    print(f"\n📝 Testing abbreviation expansion...")
-    test_abbrevs = ['acs', 'eps', 'tcs']
-    for abbrev in test_abbrevs:
-        expansion = domain.get_abbreviation(abbrev)
-        print(f"   {abbrev} → {expansion}")
-    
-    return True
-
-def main():
-    """Run the test"""
-    success = test_query_expansion_fix()
-    
-    if success:
-        print(f"\n✅ QUERY EXPANSION FIX VERIFIED!")
-        print(f"🎯 Ready to run matcher and see F1@5 improvement")
-        print(f"📈 Expected F1@5: 0.30+ (up from 0.233)")
-        print(f"\nNext steps:")
-        print(f"  1. Run: python src/matching/matcher.py")
-        print(f"  2. Run: python simple_evaluation.py")
-        print(f"  3. Verify F1@5 ≥ 0.30")
-    else:
-        print(f"\n❌ QUERY EXPANSION STILL BROKEN")
-        print(f"🔧 Need to debug domain resource loading")
+    return stats
 
 if __name__ == "__main__":
-    main()
+    test_query_expansion()

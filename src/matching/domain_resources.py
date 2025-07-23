@@ -23,8 +23,21 @@ class DomainResources:
         self.synonyms = {}
         self.abbreviations = {}
         
+        # NEW: Initialize containers for additional domain knowledge
+        self.phrase_patterns = {
+            'requirement_patterns': {},
+            'activity_patterns': {}
+        }
+        self.matching_rules = {
+            'strong_indicators': {}
+        }
+        self.cooccurrence_terms = {}
+        
         # Load all resources with fallback logic
         self._load_resources()
+        
+        # NEW: Load extracted domain knowledge if available
+        self._load_extracted_domain_knowledge()
         
         # Verify critical functionality
         self._verify_functionality()
@@ -139,6 +152,108 @@ class DomainResources:
             logger.warning(f"⚠️ expand_terms() not expanding: {test_terms} → {expanded}")
         else:
             logger.info(f"✅ expand_terms() working: {len(test_terms)} → {len(expanded)} terms")
+    
+    def _load_extracted_domain_knowledge(self):
+        """Load additional domain knowledge from extracted_domain_knowledge.json."""
+        try:
+            # Try multiple locations for the extracted domain knowledge file
+            possible_paths = [
+                Path("extracted_domain_knowledge.json"),
+                self.domain_knowledge_path / "extracted_domain_knowledge.json",
+                self.domain_path / "extracted_domain_knowledge.json"
+            ]
+            
+            domain_knowledge_data = None
+            for path in possible_paths:
+                if path.exists():
+                    with open(path, 'r', encoding='utf-8') as f:
+                        domain_knowledge_data = json.load(f)
+                        logger.info(f"📚 Loaded extracted domain knowledge from {path}")
+                        break
+            
+            if domain_knowledge_data:
+                # Extract phrase patterns
+                if 'domain_knowledge' in domain_knowledge_data:
+                    dk = domain_knowledge_data['domain_knowledge']
+                    
+                    # Load phrase patterns
+                    if 'phrase_patterns' in dk:
+                        self.phrase_patterns = dk['phrase_patterns']
+                        total_phrases = len(self.phrase_patterns.get('requirement_patterns', {})) + \
+                                      len(self.phrase_patterns.get('activity_patterns', {}))
+                        logger.info(f"📝 Loaded {total_phrases} phrase patterns")
+                    
+                    # Load matching rules
+                    if 'matching_rules' in dk:
+                        self.matching_rules = dk['matching_rules']
+                        strong_indicators = self.matching_rules.get('strong_indicators', {})
+                        logger.info(f"🎯 Loaded {len(strong_indicators)} matching rules")
+                    
+                    # Load cooccurrence terms (for richer domain scoring)
+                    if 'vocabulary' in dk and 'cooccurrence_synonyms' in dk['vocabulary']:
+                        self.cooccurrence_terms = dk['vocabulary']['cooccurrence_synonyms']
+                        logger.info(f"🔗 Loaded {len(self.cooccurrence_terms)} cooccurrence term mappings")
+            else:
+                logger.info("📋 No extracted domain knowledge found - using baseline resources only")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load extracted domain knowledge: {e}")
+    
+    def get_phrase_patterns(self) -> Dict[str, Dict[str, int]]:
+        """Get phrase patterns from domain knowledge."""
+        return self.phrase_patterns
+    
+    def get_matching_rules(self) -> Dict[str, Dict[str, int]]:
+        """Get matching rules from domain knowledge."""
+        return self.matching_rules
+    
+    def get_strong_indicator_words(self) -> Set[str]:
+        """Get words that strongly indicate requirement-activity matches."""
+        strong_indicators = self.matching_rules.get('strong_indicators', {})
+        # Extract just the words (remove 'shared_word:' prefix)
+        words = set()
+        for indicator in strong_indicators:
+            if indicator.startswith('shared_word:'):
+                word = indicator.replace('shared_word:', '')
+                words.add(word)
+        return words
+    
+    def check_phrase_overlap(self, text1: str, text2: str) -> float:
+        """Check if important phrases appear in both texts."""
+        text1_lower = text1.lower()
+        text2_lower = text2.lower()
+        
+        score = 0.0
+        
+        # Check requirement patterns
+        for phrase, count in self.phrase_patterns.get('requirement_patterns', {}).items():
+            if count >= 2:  # Only consider phrases that appear at least twice
+                if phrase in text1_lower and phrase in text2_lower:
+                    # Higher score for more frequent phrases
+                    score += 0.1 * (1 + min(count / 10, 1))
+        
+        # Check activity patterns
+        for phrase, count in self.phrase_patterns.get('activity_patterns', {}).items():
+            if count >= 2:
+                if phrase in text1_lower and phrase in text2_lower:
+                    score += 0.1 * (1 + min(count / 10, 1))
+        
+        return min(score, 1.0)
+    
+    def get_domain_cooccurrence_score(self, req_terms: Set[str], act_terms: Set[str]) -> float:
+        """Score based on learned term co-occurrences."""
+        score = 0.0
+        
+        # Check if requirement terms have activity terms as cooccurrence partners
+        for req_term in req_terms:
+            if req_term in self.cooccurrence_terms:
+                cooccurring = set(self.cooccurrence_terms[req_term])
+                overlap = cooccurring & act_terms
+                if overlap:
+                    # More overlap = higher score
+                    score += 0.1 * len(overlap)
+        
+        return min(score, 1.0)
     
     def get_resource_status(self) -> Dict[str, str]:
         """Get status of which resources are being used."""
