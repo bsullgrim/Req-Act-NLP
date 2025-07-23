@@ -392,8 +392,8 @@ class AerospaceMatcher:
         explanation = f"Text-based similarity: {similarity:.3f}"
         return similarity, explanation    
     
-    def compute_bm25_score(self, req_terms: List[str], act_terms: List[str], 
-                          corpus_stats: Dict[str, Any]) -> Tuple[float, str]:
+    def compute_bm25_score(self, req_terms: List[str], act_terms: List[str],
+                        corpus_stats: Dict[str, Any]) -> Tuple[float, str]:
         """Compute BM25 score with aerospace term boosting."""
         
         score = 0.0
@@ -401,9 +401,9 @@ class AerospaceMatcher:
         avgdl = corpus_stats.get('avg_doc_length', doc_len)
         N = corpus_stats.get('total_docs', 1)
         
-        # BM25 parameters
-        k1 = 1.2
-        b = 0.1
+        # BM25 parameters - TUNED FOR BETTER PERFORMANCE
+        k1 = 1.5  # Increased from 1.2 for better term frequency saturation
+        b = 0.3   # Increased from 0.1 for less document length penalty
         
         matching_terms = []
         aerospace_matches = []
@@ -418,22 +418,25 @@ class AerospaceMatcher:
                 tf_component = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (doc_len / avgdl)))
                 term_score = idf * tf_component
                 
-                # Boost aerospace terms
+                # Boost aerospace terms (but less aggressively)
                 if term in self.all_aerospace_terms:
-                    term_score *= 1.5
+                    term_score *= 1.3  # Reduced from 1.5
                     aerospace_matches.append(term)
-                # BOOST for short activities with exact matches
-                if len(act_terms) <= 3:
-                    exact_matches = len(set(req_terms) & set(act_terms))
-                    if exact_matches > 0:
-                        score *= (1 + 0.5 * exact_matches)  # 50% boost per exact match    
                 
                 score += term_score
                 matching_terms.append(term)
         
-        # Normalize by theoretical maximum
+        # BOOST for short activities with exact matches (moved OUTSIDE the loop!)
+        if len(act_terms) <= 3:
+            exact_matches = len(set(req_terms) & set(act_terms))
+            if exact_matches > 0:
+                score *= (1 + 0.3 * exact_matches)  # Reduced from 0.5 to 0.3
+        
+        # Normalize by theoretical maximum with coverage consideration
         if req_terms:
-            normalized_score = min(1.0, score / 10.0)  # Cap at 1.0, scale by 10
+            # Add coverage component
+            coverage = len(matching_terms) / len(set(req_terms))
+            normalized_score = min(1.0, (score / 10.0) * (0.8 + 0.2 * coverage))
         else:
             normalized_score = 0
         

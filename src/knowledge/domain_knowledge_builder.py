@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class DomainKnowledgeBuilder:
     """Extract domain knowledge from existing manual requirement-activity traces."""
     
-    def __init__(self, spacy_model: str = "en_core_web_lg"):
+    def __init__(self, spacy_model: str = "en_core_web_trf"):
         # Initialize spaCy with fallback models
         try:
             self.nlp = spacy.load(spacy_model)
@@ -243,8 +243,12 @@ class DomainKnowledgeBuilder:
         synonym_freq = Counter(synonym_pairs)
         high_confidence_synonyms = {pair: count for pair, count in synonym_freq.items() if count >= 2}
         
-        # Add co-occurrence based synonyms
+        # Add co-occurrence based synonyms with STRICT filtering
         for term1, counter in self.term_cooccurrence.items():
+            # Skip common words that shouldn't have many synonyms
+            if term1 in {'system', 'shall', 'the', 'data', 'time', 'year', 'day'}:
+                continue
+                
             for term2, count in counter.items():
                 if count >= 3 and term1 != term2:  # Co-occur at least 3 times
                     # Only add if they're actually similar
@@ -531,38 +535,57 @@ class DomainKnowledgeBuilder:
         # Add domain-specific vocabulary mappings
         vocab_mappings = domain_knowledge.get('domain_knowledge', {}).get('vocabulary', {}).get('vocabulary_mappings', {})
         
+        # Filter out bad "synonyms" before adding
+        MAX_SYNONYMS_PER_TERM = 8  # Reasonable limit
+        
         for term, similar_terms in vocab_mappings.items():
+            # Skip terms that shouldn't have many synonyms
+            if term in {'system', 'data', 'time', 'year', 'day', 'shall', 'will', 'must'}:
+                continue
+                
             if term not in synonyms:
                 synonyms[term] = []
             
+            # Only add truly similar terms
+            added_count = 0
             for similar_term in similar_terms:
-                if similar_term not in synonyms[term]:
-                    synonyms[term].append(similar_term)
+                if similar_term not in synonyms[term] and added_count < MAX_SYNONYMS_PER_TERM:
+                    # Double-check similarity
+                    if self._are_semantically_similar(term, similar_term):
+                        synonyms[term].append(similar_term)
+                        added_count += 1
         
-        # ENHANCED: Add co-occurrence based synonyms
+        # ENHANCED: Add co-occurrence based synonyms (already filtered)
         cooccurrence_syns = domain_knowledge.get('domain_knowledge', {}).get('vocabulary', {}).get('cooccurrence_synonyms', {})
         for term, syns in cooccurrence_syns.items():
             if term not in synonyms:
-                synonyms[term] = syns
+                synonyms[term] = syns[:MAX_SYNONYMS_PER_TERM]  # Limit
             else:
-                for syn in syns:
-                    if syn not in synonyms[term]:
+                for syn in syns[:MAX_SYNONYMS_PER_TERM]:
+                    if syn not in synonyms[term] and len(synonyms[term]) < MAX_SYNONYMS_PER_TERM:
                         synonyms[term].append(syn)
         
         # CRITICAL: Ensure bidirectional synonyms for query expansion
         bidirectional_synonyms = {}
         for term, syns in synonyms.items():
-            if term not in bidirectional_synonyms:
-                bidirectional_synonyms[term] = list(syns)
-            
-            # Make sure reverse mappings exist
+            # Clean the synonym list
+            clean_syns = []
             for syn in syns:
+                if syn != term and len(syn) > 2 and syn not in clean_syns:
+                    clean_syns.append(syn)
+            
+            if clean_syns:
+                bidirectional_synonyms[term] = clean_syns[:MAX_SYNONYMS_PER_TERM]
+            
+            # Ensure bidirectional
+            for syn in clean_syns[:MAX_SYNONYMS_PER_TERM]:
                 if syn not in bidirectional_synonyms:
                     bidirectional_synonyms[syn] = []
-                if term not in bidirectional_synonyms[syn]:
+                if term not in bidirectional_synonyms[syn] and len(bidirectional_synonyms[syn]) < MAX_SYNONYMS_PER_TERM:
                     bidirectional_synonyms[syn].append(term)
         
         print(f"✅ Created bidirectional synonyms for {len(bidirectional_synonyms)} terms")
+        print(f"📊 Average synonyms per term: {sum(len(s) for s in bidirectional_synonyms.values()) / len(bidirectional_synonyms):.1f}")
         
         return bidirectional_synonyms
 
