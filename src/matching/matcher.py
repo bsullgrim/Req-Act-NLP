@@ -10,10 +10,8 @@ import logging
 from pathlib import Path
 from collections import Counter
 import math
-import chardet
 import spacy
 import json
-import time
 import re
 import torch
 from dataclasses import dataclass
@@ -31,7 +29,7 @@ from src.matching.domain_resources import DomainResources
 # Optional dependencies
 try:
     from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
@@ -102,7 +100,6 @@ class AerospaceMatcher:
         # Load aerospace knowledge
         self.all_aerospace_terms = self.domain.get_domain_terms()
         self.synonyms = self.domain.synonyms
-        #self.synonyms = self._load_aerospace_synonyms()
 
         
         # Performance caches
@@ -161,16 +158,43 @@ class AerospaceMatcher:
             self.use_enhanced_semantic = False
             logger.info("📦 Install sentence-transformers for enhanced semantic matching")
 
-    def _detect_encoding(self, file_path: str) -> str:
-        """Detect file encoding with fallback to UTF-8."""
-        try:
-            with open(file_path, 'rb') as file:
-                raw_data = file.read()
-                result = chardet.detect(raw_data)
-                return result['encoding'] or 'utf-8'
-        except:
-            return 'utf-8'
-           
+    def load_requirements(self, path: str) -> pd.DataFrame:
+        """Load requirements data with proper error handling (FIXED empty requirements issue)."""
+        df = self.file_handler.safe_read_csv(path)
+        
+        # Handle empty requirements (addressing user's issue)
+        original_count = len(df)
+        df = df.dropna(subset=['Requirement Text'])
+        df = df[df['Requirement Text'].str.strip() != '']
+        
+        if len(df) < original_count:
+            removed_count = original_count - len(df)
+            logger.warning(f"⚠️ Removed {removed_count} empty requirements")
+        
+        return df.fillna({"Requirement Text": "", "ID": "", "Requirement Name": ""})
+    
+    def load_activities(self, path: str) -> pd.DataFrame:
+        """Load activities data with duplicate removal (FIXED main duplicate issue)."""
+        df = self.file_handler.safe_read_csv(path)
+        
+        # Handle empty activities
+        original_count = len(df)
+        df = df.dropna(subset=['Activity Name'])
+        df = df[df['Activity Name'].str.strip() != '']
+        
+        # Remove duplicates (addressing user's main F1 score issue)
+        df_deduped = df.drop_duplicates(subset=['Activity Name'], keep='first')
+        
+        if len(df_deduped) < len(df):
+            duplicate_count = len(df) - len(df_deduped)
+            logger.warning(f"⚠️ Removed {duplicate_count} duplicate activities")
+        
+        if len(df_deduped) < original_count:
+            removed_count = original_count - len(df_deduped)
+            logger.info(f"📊 Cleaned activities: {original_count} → {len(df_deduped)} ({removed_count} removed)")
+        
+        return df_deduped.fillna({"Activity Name": ""})
+          
     def _expand_aerospace_abbreviations(self, text: str) -> str:
         """Expand common aerospace abbreviations in text using domain resources."""
         text_lower = text.lower()
@@ -225,47 +249,7 @@ class AerospaceMatcher:
         # Cache result
         self.preprocessing_cache[text] = terms
         return terms
-    
-    def precompute_embeddings(self, req_texts: List[str], act_texts: List[str]) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Precompute embeddings for all requirements and activities.
-        
-        Args:
-            req_texts: List of requirement texts
-            act_texts: List of activity texts
-            
-        Returns:
-            Tuple of (req_embeddings, act_embeddings) numpy arrays
-        """
-        if not self.use_enhanced_semantic:
-            return None, None  # Skip precomputation if not using enhanced semantics
-        
-        try:
-            print(f"🔄 Precomputing embeddings for {len(req_texts)} requirements...")
-            req_embeddings = self.semantic_model.encode(
-                req_texts, 
-                batch_size=32,  # Adjust based on GPU memory
-                show_progress_bar=True,
-                normalize_embeddings=True  # For faster cosine similarity
-            )
-            
-            print(f"🔄 Precomputing embeddings for {len(act_texts)} activities...")
-            act_embeddings = self.semantic_model.encode(
-                act_texts, 
-                batch_size=32,
-                show_progress_bar=True,
-                normalize_embeddings=True
-            )
-            
-            print(f"✅ Embeddings precomputed successfully!")
-            print(f"   Requirements: {req_embeddings.shape}")
-            print(f"   Activities: {act_embeddings.shape}")
-            return req_embeddings, act_embeddings
-            
-        except Exception as e:
-            logger.warning(f"Embedding precomputation failed: {e}")
-            return None, None
-    
+
     def extract_domain_weights(self, corpus: List[str]) -> Dict[str, float]:
         """Extract aerospace domain term weights using TF-IDF or fallback method."""
         
@@ -780,21 +764,18 @@ class AerospaceMatcher:
         
         # Load data
         logger.info("📂 Loading input files...")
-        requirements_df = self.file_handler.safe_read_csv(requirements_file).fillna({"Requirement Text": ""})
-        activities_df = self.file_handler.safe_read_csv(activities_file).fillna({"Activity Name": ""})
+        # requirements_df = self.file_handler.safe_read_csv(requirements_file).fillna({"Requirement Text": ""})
+        # activities_df = self.file_handler.safe_read_csv(activities_file).fillna({"Activity Name": ""})
         
+        requirements_df = self.load_requirements(resolved_paths['requirements'])
+        activities_df = self.load_activities(resolved_paths['activities'])
+
         logger.info(f"📊 Loaded {len(requirements_df)} requirements and {len(activities_df)} activities")
         
         # OPTIMIZATION: Precompute embeddings once for massive speedup
         req_texts = list(requirements_df["Requirement Text"])
         act_texts = list(activities_df["Activity Name"])
         
-        self._req_embeddings, self._act_embeddings = self.precompute_embeddings(req_texts, act_texts)
-        
-        if self._req_embeddings is not None:
-            print("🚀 Using precomputed embeddings for 20x speed boost!")
-        else:
-            print("💻 Using individual embedding computation")
         
         # Prepare corpus for analysis
         req_texts = list(requirements_df["Requirement Text"])
@@ -1128,25 +1109,6 @@ def main():
             print(f"⚠️ Workbook creation failed: {e}")
             workbook_path = None
         
-        # === USE EXISTING simple_dashboard ===
-        dashboard_path = None
-        try:
-            print(f"\n🌐 Creating simple dashboard...")
-            # Import existing dashboard function
-            from src.dashboard.simple_dashboard import create_simple_dashboard
-            
-            # Use existing create_simple_dashboard function (UNCHANGED SIGNATURE)
-            dashboard_path = create_simple_dashboard(
-                enhanced_df=results_df,
-                evaluation_results=formatted_eval_results,  # Use formatted results
-                repo_manager=repo_manager
-            )
-            
-        except ImportError:
-            print("ℹ️ Simple dashboard not available")
-        except Exception as e:
-            print(f"⚠️ Dashboard creation failed: {e}")
-        
         # === FINAL SUMMARY (unchanged) ===
         print(f"\n🎊 Generated Outputs:")
         print(f"   1. 📄 CSV results: outputs/matching_results/aerospace_matches.csv")
@@ -1158,9 +1120,6 @@ def main():
         
         if workbook_path:
             print(f"   5. 📋 Matching workbook: {workbook_path}")
-        
-        if dashboard_path:
-            print(f"   6. 🌐 Simple dashboard: {dashboard_path}")
         
         # Performance summary (unchanged)
         print(f"\n📈 Performance Summary:")

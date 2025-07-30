@@ -278,9 +278,7 @@ class DomainResources:
         status['abbreviations'] = f"Baseline ({len(self.abbreviations)} terms)"
         
         return status
-    
-    # [Keep all other methods unchanged - expand_terms, get_synonyms, etc.]
-    
+        
     def get_domain_terms(self, category: Optional[str] = None) -> Set[str]:
         """Get domain vocabulary terms."""
         if category and category in self.vocabulary:

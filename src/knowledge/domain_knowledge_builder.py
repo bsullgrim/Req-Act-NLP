@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 class DomainKnowledgeBuilder:
     """Extract domain knowledge from existing manual requirement-activity traces."""
     
-    def __init__(self, spacy_model: str = "en_core_web_trf"):
+    def __init__(self, spacy_model: str = "en_core_web_lg"):
         # Initialize spaCy with fallback models
         try:
             self.nlp = spacy.load(spacy_model)

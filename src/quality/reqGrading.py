@@ -1,62 +1,51 @@
 """
-Enhanced Requirements Quality Analyzer v2.0
-Advanced NLP with INCOSE pattern analysis and semantic features
+Enhanced Requirements Quality Analyzer with 4-Tab Excel Output
+Provides comprehensive analysis with Summary, Quality, INCOSE, and Semantic tabs.
 """
 
 import pandas as pd
-import logging
-import spacy
-import re
 import numpy as np
-from typing import Dict, List, Tuple, Optional, Set
+from typing import List, Dict, Tuple, Optional, Any, Set
+import logging
 from pathlib import Path
-import argparse
-from dataclasses import dataclass, field
-from collections import Counter, defaultdict
+import spacy
 import json
+import re
+from dataclasses import dataclass, field, asdict
+from collections import Counter, defaultdict
+import argparse
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from openpyxl.utils.dataframe import dataframe_to_rows
+
+# Import utilities
 import sys
 import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
-# Add project root to path for proper imports
-current_file = Path(__file__).resolve()
-project_root = current_file.parent.parent.parent
-sys.path.insert(0, str(project_root))
+from src.utils.file_utils import SafeFileHandler
+from src.utils.path_resolver import SmartPathResolver
+from src.utils.repository_setup import RepositoryStructureManager
 
-# Import your existing utils
-try:
-    from src.utils.file_utils import SafeFileHandler
-    from src.utils.path_resolver import SmartPathResolver
-    from src.utils.repository_setup import RepositoryStructureManager
-    UTILS_AVAILABLE = True
-    print("✅ Successfully imported project utils")
-except ImportError as e:
-    print(f"⚠️ Could not import utils: {e}")
-    UTILS_AVAILABLE = False
-    sys.exit(1)
-
-# Setup enhanced logging
-logging.basicConfig(
-    level=logging.INFO, 
-    format="%(asctime)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
-)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @dataclass
 class QualityMetrics:
-    """Enhanced container for requirement quality metrics"""
+    """Container for requirement quality metrics."""
     clarity_score: float
     completeness_score: float
     verifiability_score: float
     atomicity_score: float
     consistency_score: float
-    incose_compliance_score: float  # New: INCOSE pattern compliance
-    semantic_quality_score: float   # New: Semantic analysis score
+    incose_compliance_score: float
+    semantic_quality_score: float
     total_issues: int
     severity_breakdown: Dict[str, int]
 
 @dataclass
 class INCOSEAnalysis:
-    """INCOSE pattern analysis results"""
+    """INCOSE pattern analysis results."""
     best_pattern: str
     compliance_score: float
     components_found: Dict[str, Optional[str]]
@@ -67,7 +56,7 @@ class INCOSEAnalysis:
 
 @dataclass
 class SemanticAnalysis:
-    """Semantic analysis results"""
+    """Semantic analysis results."""
     similarity_issues: List[Dict]
     contextual_ambiguities: List[str]
     entity_completeness: Dict[str, List[str]]
@@ -75,7 +64,7 @@ class SemanticAnalysis:
     improvement_suggestions: List[str]
 
 class INCOSEPatternAnalyzer:
-    """INCOSE requirements pattern analyzer"""
+    """INCOSE requirements pattern analyzer."""
     
     def __init__(self, nlp):
         self.nlp = nlp
@@ -143,7 +132,7 @@ class INCOSEPatternAnalyzer:
         }
     
     def extract_incose_components(self, doc) -> Dict[str, Optional[str]]:
-        """Extract INCOSE requirement components using advanced NLP"""
+        """Extract INCOSE requirement components."""
         components = {comp: None for comp in [
             'AGENT', 'FUNCTION', 'CHARACTERISTIC', 'PERFORMANCE', 'CONDITION',
             'ENVIRONMENT', 'TIMING', 'INTERFACE_OUTPUT', 'INTERFACE_INPUT',
@@ -184,7 +173,7 @@ class INCOSEPatternAnalyzer:
             if token.text.lower() in quality_terms:
                 components['CHARACTERISTIC'] = token.text
                 break
-        
+
         # Extract DESIGN_CONSTRAINTS
         constraint_indicators = ["shall not", "must not", "cannot", "limited to", "constrained by"]
         for indicator in constraint_indicators:
@@ -195,7 +184,7 @@ class INCOSEPatternAnalyzer:
         return components
     
     def analyze_incose_compliance(self, text: str) -> INCOSEAnalysis:
-        """Analyze requirement against INCOSE patterns"""
+        """Analyze requirement against INCOSE patterns."""
         doc = self.nlp(text)
         components = self.extract_incose_components(doc)
         
@@ -234,139 +223,105 @@ class INCOSEPatternAnalyzer:
         )
     
     def score_pattern_match(self, components: Dict, pattern_def: Dict) -> float:
-        """Score how well components match INCOSE pattern"""
+        """Score how well components match INCOSE pattern."""
         required_found = sum(1 for comp in pattern_def['required'] if components.get(comp))
         optional_found = sum(1 for comp in pattern_def['optional'] if components.get(comp))
         
         required_score = (required_found / len(pattern_def['required'])) * 80
-        optional_bonus = (optional_found / len(pattern_def['optional'])) * 20
+        optional_bonus = (optional_found / len(pattern_def['optional'])) * 20 if pattern_def['optional'] else 0
         
         return min(100, required_score + optional_bonus)
     
     def generate_pattern_suggestions(self, components: Dict, pattern_def: Dict) -> List[str]:
-        """Generate improvement suggestions based on missing components"""
+        """Generate improvement suggestions based on missing components."""
         suggestions = []
         
         component_guidance = {
             'AGENT': "Specify the system, subsystem, or component responsible (e.g., 'The navigation system', 'The user interface')",
             'FUNCTION': "Define the specific action or capability (e.g., 'shall calculate', 'shall display', 'shall process')",
-            'PERFORMANCE': "Add measurable criteria (e.g., 'within 2 seconds', 'with 99% accuracy', '±0.1% tolerance')",
+            'PERFORMANCE': "Add measurable criteria (e.g., 'within 2 seconds', '±0.1% tolerance')",
             'CONDITION': "Specify operational state (e.g., 'while in normal operation', 'during startup', 'when receiving input')",
             'TIMING': "Add temporal constraints (e.g., 'within 5 seconds', 'upon system startup', 'every 30 minutes')",
             'CHARACTERISTIC': "Define quality attribute (e.g., 'reliability', 'accuracy', 'availability', 'security')",
             'ENVIRONMENT': "Specify environmental conditions (e.g., 'temperature range -40°C to 85°C', 'humidity 0-95%')"
         }
-        
-        for missing_comp in pattern_def['required']:
-            if not components.get(missing_comp):
-                suggestions.append(f"Add {missing_comp}: {component_guidance.get(missing_comp, f'Define {missing_comp} component')}")
+        for comp in pattern_def['required']:
+            if not components.get(comp):
+                guidance = component_guidance.get(comp, f"Add {comp}")
+                suggestions.append(f"Missing {comp}: {guidance}")
         
         return suggestions
     
     def create_template_recommendation(self, components: Dict, pattern_def: Dict) -> str:
-        """Create INCOSE-compliant template recommendation"""
+        """Create a filled template recommendation."""
         template = pattern_def['template']
         
-        # Fill in known components
-        filled_template = template
-        for comp_name, comp_value in components.items():
-            if comp_value:
-                placeholder = f"{{{comp_name}}}"
-                filled_template = filled_template.replace(placeholder, comp_value)
+        # Fill in found components
+        for comp, value in components.items():
+            if value:
+                template = template.replace(f"{{{comp}}}", value)
         
-        return filled_template
+        # Highlight missing components
+        for comp in pattern_def['required']:
+            if not components.get(comp):
+                template = template.replace(f"{{{comp}}}", f"<MISSING {comp}>")
+        
+        # Remove optional components
+        template = re.sub(r'\[.*?\]', '', template)
+        
+        return template
 
 class SemanticAnalyzer:
-    """Advanced semantic analysis using spaCy vectors"""
+    """Semantic quality analyzer for requirements."""
     
     def __init__(self, nlp):
         self.nlp = nlp
-        self.similarity_threshold = 0.85
+        
+        # Ambiguous terms
+        self.ambiguous_terms = {
+            'vague_quantifiers': ['some', 'many', 'few', 'several', 'various'],
+            'vague_qualities': ['appropriate', 'adequate', 'suitable', 'proper'],
+            'vague_actions': ['handle', 'manage', 'deal', 'support', 'address']
+        }
+        
+        # Subjective terms
         self.subjective_terms = {
-            "emotional": ["love", "hate", "amazing", "terrible", "beautiful", "ugly", "awesome", "horrible"],
-            "uncertainty": ["maybe", "perhaps", "possibly", "probably", "likely", "might be"],
-            "subjective": ["obviously", "clearly", "naturally", "of course", "simply"]
+            'emotional': ['amazing', 'terrible', 'excellent', 'awful'],
+            'subjective': ['good', 'bad', 'best', 'worst', 'better'],
+            'uncertainty': ['maybe', 'perhaps', 'possibly', 'might']
         }
     
     def analyze_semantic_quality(self, text: str) -> SemanticAnalysis:
-        """Comprehensive semantic analysis"""
+        """Perform semantic analysis on requirement text."""
         doc = self.nlp(text)
         
+        # Extract entities
+        entity_completeness = self.extract_entities(doc)
+        
+        # Find ambiguities
+        contextual_ambiguities = self.find_contextual_ambiguities(doc)
+        
+        # Analyze tone
+        tone_issues = self.analyze_tone_and_subjectivity(doc)
+        
+        # Generate suggestions
+        suggestions = self.generate_semantic_suggestions(doc)
+        
         return SemanticAnalysis(
-            similarity_issues=[],  # Will be filled by batch analysis
-            contextual_ambiguities=self.analyze_contextual_ambiguity(doc),
-            entity_completeness=self.analyze_entity_completeness(doc),
-            tone_issues=self.analyze_tone_and_subjectivity(doc),
-            improvement_suggestions=self.generate_semantic_suggestions(doc)
+            similarity_issues=[],  # Will be filled by similarity analysis
+            contextual_ambiguities=contextual_ambiguities,
+            entity_completeness=entity_completeness,
+            tone_issues=tone_issues,
+            improvement_suggestions=suggestions
         )
     
-    def analyze_contextual_ambiguity(self, doc) -> List[str]:
-        """Find ambiguous terms with context analysis"""
-        ambiguities = []
-        ambiguous_base_terms = ["appropriate", "reasonable", "adequate", "sufficient", "good", "bad", "fast", "slow"]
-        
-        for token in doc:
-            if token.text.lower() in ambiguous_base_terms:
-                context_info = self.get_token_context(token)
-                
-                if context_info['modifying']:
-                    ambiguities.append(
-                        f"'{token.text}' modifying '{context_info['modifying']}' - "
-                        f"specify {self.suggest_specific_criteria(token.text.lower(), context_info['modifying'])}"
-                    )
-                
-                # Check for missing quantification
-                if not context_info['has_numbers']:
-                    ambiguities.append(
-                        f"'{token.text}' lacks quantitative criteria - add measurable thresholds"
-                    )
-        
-        return ambiguities
-    
-    def get_token_context(self, token) -> Dict:
-        """Analyze the context around a token"""
-        context = {
-            'modifying': None,
-            'has_numbers': False,
-            'nearby_units': [],
-            'sentence_numbers': []
-        }
-        
-        # What is this token modifying?
-        if token.head and token.head.pos_ == "NOUN":
-            context['modifying'] = token.head.text
-        
-        # Are there numbers in the sentence?
-        for sent_token in token.sent:
-            if sent_token.like_num or sent_token.is_digit:
-                context['has_numbers'] = True
-                context['sentence_numbers'].append(sent_token.text)
-        
-        return context
-    
-    def suggest_specific_criteria(self, ambiguous_term: str, modified_noun: str) -> str:
-        """Suggest specific criteria based on context"""
-        suggestions = {
-            ("appropriate", "time"): "specific time limit (e.g., '< 2 seconds')",
-            ("appropriate", "response"): "response time threshold (e.g., 'within 500ms')",
-            ("good", "performance"): "performance metrics (e.g., 'throughput ≥ 1000 ops/sec')",
-            ("reasonable", "accuracy"): "accuracy percentage (e.g., '≥ 95% accuracy')",
-            ("adequate", "security"): "security standards (e.g., 'AES-256 encryption')",
-            ("sufficient", "memory"): "memory requirements (e.g., '≥ 4GB RAM')",
-            ("fast", "processing"): "processing speed (e.g., '< 100ms processing time')",
-        }
-        
-        key = (ambiguous_term, modified_noun.lower() if modified_noun else "")
-        return suggestions.get(key, f"measurable criteria for {modified_noun or 'this attribute'}")
-    
-    def analyze_entity_completeness(self, doc) -> Dict[str, List[str]]:
-        """Extract and categorize requirement entities"""
+    def extract_entities(self, doc) -> Dict[str, List[str]]:
+        """Extract semantic entities from requirement."""
         entities = {
             'actors': [],
             'actions': [],
             'objects': [],
             'conditions': [],
-            'constraints': [],
             'standards': []
         }
         
@@ -385,12 +340,31 @@ class SemanticAnalyzer:
             if token.dep_ in ["dobj", "pobj"]:
                 entities['objects'].append(token.text)
         
+        # Extract conditions
+        for token in doc:
+            if token.dep_ == "mark" and token.text.lower() in ["if", "when", "while", "during"]:
+                # Get the clause
+                clause_tokens = list(token.head.subtree)
+                condition = " ".join([t.text for t in clause_tokens])
+                entities['conditions'].append(condition)
+        
         # Extract standards and compliance references
         for ent in doc.ents:
             if ent.label_ == "ORG" and any(std in ent.text.upper() for std in ["ISO", "IEEE", "ANSI", "FIPS"]):
                 entities['standards'].append(ent.text)
-        
         return entities
+    
+    def find_contextual_ambiguities(self, doc) -> List[str]:
+        """Find contextual ambiguities in text."""
+        ambiguities = []
+        
+        for category, terms in self.ambiguous_terms.items():
+            for token in doc:
+                if token.text.lower() in terms:
+                    context = self._get_token_context(token, doc)
+                    ambiguities.append(f"{token.text} ({category}): {context}")
+        
+        return ambiguities
     
     def analyze_tone_and_subjectivity(self, doc) -> List[str]:
         """Detect inappropriate tone and subjective language"""
@@ -409,14 +383,19 @@ class SemanticAnalyzer:
         return issues
     
     def generate_semantic_suggestions(self, doc) -> List[str]:
-        """Generate improvement suggestions based on semantic analysis"""
+        """Generate improvement suggestions based on semantic analysis."""
         suggestions = []
         
         # Check for missing quantification
         has_numbers = any(token.like_num for token in doc)
         if not has_numbers:
-            suggestions.append("Add quantitative criteria to make requirement verifiable")
+            suggestions.append("Add quantitative criteria for verifiability")
         
+        # Check for passive voice
+        passive_pattern = r'\b(is|are|was|were|been|being)\s+\w+ed\b'
+        if re.search(passive_pattern, doc.text, re.IGNORECASE):
+            suggestions.append("Use active voice for clarity")
+
         # Check for vague action verbs
         vague_verbs = ["handle", "manage", "deal with", "work with", "support"]
         for token in doc:
@@ -427,77 +406,66 @@ class SemanticAnalyzer:
         if any(verb.lemma_ in ["process", "calculate", "validate"] for verb in doc if verb.pos_ == "VERB"):
             if "error" not in doc.text.lower() and "fail" not in doc.text.lower():
                 suggestions.append("Consider adding error handling or failure mode specification")
-        
+          
         return suggestions
     
-    def find_similar_requirements(self, requirements_list: List[str], threshold: float = 0.85) -> List[Dict]:
-        """Find potentially duplicate requirements using semantic similarity"""
+    def _get_token_context(self, token, doc, window=3) -> str:
+        """Get context around a token."""
+        start = max(0, token.i - window)
+        end = min(len(doc), token.i + window + 1)
+        context_tokens = doc[start:end]
+        return " ".join([t.text for t in context_tokens])
+    
+    def find_similar_requirements(self, requirements_list: List[str], threshold: float = 0.95) -> List[Dict]:
+        """Find potentially duplicate requirements using semantic similarity."""
         if not self.nlp.meta.get('vectors', 0):
-            return []  # No vectors available
+            return []
         
-        docs = [self.nlp(req) for req in requirements_list]
+        docs = [self.nlp(req) for req in requirements_list if req.strip()]
         similarities = []
         
         for i, doc1 in enumerate(docs):
             for j, doc2 in enumerate(docs[i+1:], i+1):
                 try:
-                    similarity = doc1.similarity(doc2)
-                    if similarity > threshold:
-                        similarities.append({
-                            'req1_index': i,
-                            'req2_index': j,
-                            'similarity': float(similarity),
-                            'req1_text': requirements_list[i][:100] + "..." if len(requirements_list[i]) > 100 else requirements_list[i],
-                            'req2_text': requirements_list[j][:100] + "..." if len(requirements_list[j]) > 100 else requirements_list[j],
-                            'issue': f'Potential duplicate (similarity: {similarity:.2f})'
-                        })
+                    if doc1.vector_norm > 0 and doc2.vector_norm > 0:
+                        similarity = doc1.similarity(doc2)
+                        if similarity > threshold:
+                            similarities.append({
+                                'req1_index': i,
+                                'req2_index': j,
+                                'similarity': float(similarity),
+                                'req1_text': requirements_list[i][:100] + "..." if len(requirements_list[i]) > 100 else requirements_list[i],
+                                'req2_text': requirements_list[j][:100] + "..." if len(requirements_list[j]) > 100 else requirements_list[j],
+                                'issue': f'Potential duplicate (similarity: {similarity:.2f})'
+                            })
                 except:
-                    continue  # Skip if similarity calculation fails
+                    continue
         
         return similarities
 
 class EnhancedRequirementAnalyzer:
-    """Enhanced requirements quality analyzer with INCOSE patterns and advanced NLP"""
+    """Enhanced requirements quality analyzer with INCOSE patterns and advanced NLP."""
     
-    def __init__(self, spacy_model: str = "en_core_web_trf", repo_manager=None):
-        # Initialize spaCy with fallback
+    def __init__(self, spacy_model: str = "en_core_web_lg", repo_manager=None):
+        """Initialize with spaCy model and analyzers."""
+        # Initialize utilities
+        self.repo_manager = repo_manager or RepositoryStructureManager()
+        self.file_handler = SafeFileHandler()
+        self.path_resolver = SmartPathResolver()
+        
+        # Load spaCy model
         try:
             self.nlp = spacy.load(spacy_model)
-            logger.info(f"Loaded spaCy model: {spacy_model}")
+            logger.info(f"✅ Loaded spaCy model: {spacy_model}")
         except OSError:
-            logger.warning(f"spaCy model '{spacy_model}' not found. Trying fallback models...")
-            fallback_models = ["en_core_web_lg", "en_core_web_md", "en_core_web_sm"]
-            model_loaded = False
-            
-            for fallback in fallback_models:
-                try:
-                    self.nlp = spacy.load(fallback)
-                    logger.info(f"Loaded fallback spaCy model: {fallback}")
-                    model_loaded = True
-                    break
-                except OSError:
-                    continue
-            
-            if not model_loaded:
-                logger.error("No spaCy models available. Please install with:")
-                logger.error("python -m spacy download en_core_web_trf")
-                raise OSError("No suitable spaCy model found")
+            logger.warning(f"Model {spacy_model} not found, using en_core_web_sm")
+            self.nlp = spacy.load("en_core_web_sm")
         
-        # Setup utils
-        if repo_manager is None:
-            self.repo_manager = RepositoryStructureManager("outputs")
-            self.repo_manager.setup_repository_structure()
-        else:
-            self.repo_manager = repo_manager
-        
-        self.file_handler = SafeFileHandler(repo_manager=self.repo_manager)
-        self.path_resolver = SmartPathResolver(repo_manager=self.repo_manager)
-        
-        # Initialize analyzers
+        # Initialize specialized analyzers
         self.incose_analyzer = INCOSEPatternAnalyzer(self.nlp)
         self.semantic_analyzer = SemanticAnalyzer(self.nlp)
         
-        # Enhanced term definitions
+        # Quality criteria
         self.ambiguous_terms = {
             "clarity": {
                 "high": {"appropriate", "sufficient", "adequate", "efficient", "reasonable", "acceptable"},
@@ -512,20 +480,18 @@ class EnhancedRequirementAnalyzer:
         }
         
         self.modal_verbs = {
-            "mandatory": {"shall", "must", "will"},
-            "recommended": {"should", "ought"},
-            "optional": {"may", "can", "might", "could"}
+            'mandatory': ['shall', 'must', 'will'],
+            'optional': ['should', 'may'],
+            'forbidden': ['shall not', 'must not', 'will not']
         }
         
         self.passive_indicators = [
-            r'\b(is|are|was|were|being|been)\s+\w+ed\b',
-            r'\b(is|are|was|were)\s+\w+en\b'
+            r'\b(is|are|was|were|been|being)\s+\w+ed\b',
+            r'\b(is|are|was|were|been|being)\s+\w+en\b'
         ]
-        
-        logger.info("✅ Enhanced analyzer initialized with INCOSE patterns and semantic analysis")
     
-    def analyze_requirement(self, text: str, req_id: Optional[str] = None) -> Tuple[List[str], QualityMetrics, INCOSEAnalysis, SemanticAnalysis]:
-        """Enhanced requirement analysis with INCOSE patterns and semantic analysis"""
+    def analyze_requirement(self, text: str, req_id: str = None) -> Tuple[List[str], QualityMetrics, INCOSEAnalysis, SemanticAnalysis]:
+        """Analyze a single requirement with all analysis methods."""
         if pd.isna(text) or not str(text).strip():
             empty_incose = INCOSEAnalysis("", 0, {}, [], [], [], "")
             empty_semantic = SemanticAnalysis([], [], {}, [], [])
@@ -546,37 +512,19 @@ class EnhancedRequirementAnalyzer:
         # INCOSE pattern analysis
         incose_analysis = self.incose_analyzer.analyze_incose_compliance(text)
         
-        # Add INCOSE-specific issues
-        if incose_analysis.compliance_score < 70:
-            issues.append(f"INCOSE Structure (medium): Best pattern '{incose_analysis.best_pattern}' only {incose_analysis.compliance_score:.0f}% complete")
-            severity_counts["medium"] += 1
-        
-        for missing in incose_analysis.missing_required:
-            issues.append(f"INCOSE Completeness (high): Missing required {missing} component")
-            severity_counts["high"] += 1
-        
         # Semantic analysis
         semantic_analysis = self.semantic_analyzer.analyze_semantic_quality(text)
         
-        # Add semantic issues
-        for ambiguity in semantic_analysis.contextual_ambiguities:
-            issues.append(f"Semantic Clarity (high): {ambiguity}")
-            severity_counts["high"] += 1
-        
-        for tone_issue in semantic_analysis.tone_issues:
-            issues.append(f"Tone (medium): {tone_issue}")
-            severity_counts["medium"] += 1
-        
-        # Calculate semantic quality score
-        semantic_score = self._calculate_semantic_score(semantic_analysis)
-        
         # Check for implementation details
         self._check_implementation_details(text, issues, severity_counts)
+
+        # Calculate semantic score
+        semantic_score = self._calculate_semantic_score(semantic_analysis)
         
-        # Enhanced metrics with new dimensions
+        # Create metrics
         metrics = QualityMetrics(
             clarity_score=clarity_score,
-            completeness_score=max(completeness_score, incose_analysis.compliance_score * 0.7),  # Boost with INCOSE
+            completeness_score=completeness_score,
             verifiability_score=verifiability_score,
             atomicity_score=atomicity_score,
             consistency_score=consistency_score,
@@ -589,7 +537,7 @@ class EnhancedRequirementAnalyzer:
         return issues, metrics, incose_analysis, semantic_analysis
     
     def _analyze_clarity(self, doc, text: str, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
-        """Analyze clarity with enhanced detection"""
+        """Analyze clarity."""
         clarity_issues = 0
         
         # Ambiguous terms
@@ -605,13 +553,19 @@ class EnhancedRequirementAnalyzer:
         # Passive voice
         passive_issues = []
         for pattern in self.passive_indicators:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            if matches:
-                passive_issues.extend(matches)
+            if re.search(pattern, text, re.IGNORECASE):
+                issues.append(f"Clarity (medium): Passive voice detected: {', '.join(set(passive_issues))}")
+                severity_counts["medium"] += 1
+                clarity_issues += 1
+                break
         
-        if passive_issues:
-            issues.append(f"Clarity (medium): Passive voice detected: {', '.join(set(passive_issues))}")
-            severity_counts["medium"] += 1
+        # # Sentence complexity
+        # sentences = list(doc.sents)
+        # for sent in sentences:
+        #     if len([t for t in sent if not t.is_punct]) > 25:
+        #         issues.append("Clarity (medium): Complex sentence")
+        #         severity_counts["medium"] += 1
+        #         clarity_issues += 1
         
         # Readability
         readability = self._calculate_readability_score(doc)
@@ -620,33 +574,48 @@ class EnhancedRequirementAnalyzer:
             severity_counts["medium"] += 1
         
         clarity_score = max(0, 100 - (clarity_issues * 20 + len(passive_issues) * 10))
+        clarity_score = max(0, 100 - (clarity_issues * 10))
         return clarity_issues, clarity_score
     
-    def _analyze_atomicity(self, doc, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
-        """Analyze atomicity"""
-        atomicity_issues = 0
-        conjunction_count = sum(1 for token in doc if token.dep_ == "conj")
+    def _analyze_completeness(self, doc, text: str, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
+        """Analyze completeness."""
+        completeness_issues = 0
         
-        if conjunction_count > 2:
-            issues.append(f"Atomicity (high): multiple conjunctions ({conjunction_count}) suggest compound requirements")
+        # Check for modal verbs
+        text_lower = text.lower()
+        has_modal = any(modal in text_lower for modals in self.modal_verbs.values() for modal in modals)
+        
+        if not has_modal:
+            issues.append("Completeness (high): Missing modal verb (shall/must/should)")
             severity_counts["high"] += 1
-            atomicity_issues += 1
-        elif conjunction_count > 0:
-            issues.append(f"Atomicity (medium): contains {conjunction_count} conjunction(s)")
-            severity_counts["medium"] += 1
-            atomicity_issues += 1
+            completeness_issues += 1
         
-        # Length analysis
+        # Check for subject
+        has_subject = any(token.dep_ == "nsubj" for token in doc)
+        if not has_subject:
+            issues.append("Completeness (high): Missing subject/actor")
+            severity_counts["high"] += 1
+            completeness_issues += 1
+        
+        # Check for action
+        has_verb = any(token.pos_ == "VERB" for token in doc)
+        if not has_verb:
+            issues.append("Completeness (high): Missing action/verb")
+            severity_counts["high"] += 1
+            completeness_issues += 1
+        
+        # Length check
         word_count = len([token for token in doc if token.is_alpha])
-        if word_count > 50:
-            issues.append("Atomicity (low): requirement may be too long (consider splitting)")
-            severity_counts["low"] += 1
+        if word_count < 5:
+            issues.append("Completeness (medium): Too brief")
+            severity_counts["medium"] += 1
+            completeness_issues += 1
         
-        atomicity_score = max(0, 100 - (atomicity_issues * 30))
-        return atomicity_issues, atomicity_score
+        completeness_score = max(0, 100 - (completeness_issues * 15))
+        return completeness_issues, completeness_score
     
     def _analyze_verifiability(self, doc, text: str, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
-        """Enhanced verifiability analysis"""
+        """Analyze verifiability."""
         verifiability_issues = 0
         
         # Check for measurable entities
@@ -678,57 +647,35 @@ class EnhancedRequirementAnalyzer:
             severity_counts["high"] += 1
             verifiability_issues += 1
         
-        verifiability_score = max(0, 100 - (verifiability_issues * 30))
+        verifiability_score = max(0, 100 - (verifiability_issues * 20))
         return verifiability_issues, verifiability_score
     
-    def _analyze_completeness(self, doc, text: str, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
-        """Analyze completeness"""
-        completeness_issues = 0
+    def _analyze_atomicity(self, doc, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
+        """Analyze atomicity"""
+        atomicity_issues = 0
+        conjunction_count = sum(1 for token in doc if token.dep_ == "conj")
         
-        # Check for structural components
-        has_subject = any(token.dep_ in {"nsubj", "nsubjpass"} for token in doc)
-        has_verb = any(token.pos_ == "VERB" for token in doc)
-        has_object = any(token.dep_ in {"dobj", "pobj", "attr"} for token in doc)
-        
-        missing_components = []
-        if not has_subject:
-            missing_components.append("subject")
-        if not has_verb:
-            missing_components.append("verb")
-        if not has_object:
-            missing_components.append("object")
-        
-        if missing_components:
-            issues.append(f"Completeness (high): missing {', '.join(missing_components)}")
+        if conjunction_count > 2:
+            issues.append(f"Atomicity (high): multiple conjunctions ({conjunction_count}) suggest compound requirements")
             severity_counts["high"] += 1
-            completeness_issues += len(missing_components)
-        
-        # Modal verb analysis
-        modal_found = None
-        for strength, verbs in self.modal_verbs.items():
-            for token in doc:
-                if token.text.lower() in verbs:
-                    modal_found = token.text.lower()
-                    break
-            if modal_found:
-                break
-        
-        if not modal_found:
-            issues.append("Completeness (medium): no modal verb indicating requirement strength")
+            atomicity_issues += 1
+        elif conjunction_count > 0:
+            issues.append(f"Atomicity (medium): contains {conjunction_count} conjunction(s)")
             severity_counts["medium"] += 1
-            completeness_issues += 1
+            atomicity_issues += 1
         
-        # Length check
+        # Length analysis
         word_count = len([token for token in doc if token.is_alpha])
-        if word_count < 5:
-            issues.append("Completeness (medium): requirement may be too short")
-            severity_counts["medium"] += 1
+        if word_count > 50:
+            issues.append("Atomicity (low): requirement may be too long (consider splitting)")
+            severity_counts["low"] += 1
         
-        completeness_score = max(0, 100 - (completeness_issues * 25))
-        return completeness_issues, completeness_score
-    
+        atomicity_score = max(0, 100 - (atomicity_issues * 30))
+        return atomicity_issues, atomicity_score
+        
     def _analyze_consistency(self, doc, issues: List[str], severity_counts: Dict[str, int]) -> float:
-        """Analyze consistency"""
+        """Analyze consistency."""
+        # For now, just check if modal verb is present
         modal_found = False
         for strength, verbs in self.modal_verbs.items():
             for token in doc:
@@ -769,7 +716,7 @@ class EnhancedRequirementAnalyzer:
         if has_implementation:
             issues.append("Design (high): Contains implementation details")
             severity_counts["high"] += 1
-    
+
     def _calculate_readability_score(self, doc) -> float:
         """Calculate readability score"""
         sentences = list(doc.sents)
@@ -783,14 +730,14 @@ class EnhancedRequirementAnalyzer:
         
         score = max(0, 100 - (avg_sentence_length * 2 + complex_ratio * 50))
         return min(score, 100)
-    
+   
     def _calculate_semantic_score(self, semantic_analysis: SemanticAnalysis) -> float:
-        """Calculate semantic quality score"""
+        """Calculate semantic quality score."""
         base_score = 100
         
         # Penalize issues
-        penalty = len(semantic_analysis.contextual_ambiguities) * 15
-        penalty += len(semantic_analysis.tone_issues) * 10
+        penalty = len(semantic_analysis.contextual_ambiguities) * 10
+        penalty += len(semantic_analysis.tone_issues) * 5
         
         # Bonus for good entity completeness
         entity_bonus = 0
@@ -806,156 +753,168 @@ class EnhancedRequirementAnalyzer:
     def analyze_file(self, input_file: str = "requirements.csv", 
                     output_file: str = None,
                     requirement_column: str = "Requirement Text",
-                    excel_report: bool = False) -> pd.DataFrame:
-        """Enhanced file analysis with INCOSE and semantic features"""
+                    excel_report: bool = True) -> pd.DataFrame:
+        """Analyze requirements file with enhanced output."""
         logger.info(f"Starting enhanced analysis of {input_file}")
         
         # Resolve file path
-        print(f"🔍 Resolving file path for: {input_file}")
         resolved_paths = self.path_resolver.resolve_input_files({'requirements': input_file})
         input_file_path = resolved_paths['requirements']
         
         if not Path(input_file_path).exists():
             raise FileNotFoundError(f"Could not find requirements file: {input_file}")
         
-        print(f"✅ Found requirements file: {input_file_path}")
-        
         # Read file
         df = self.file_handler.safe_read_csv(input_file_path)
         
         if requirement_column not in df.columns:
             available_cols = list(df.columns)
-            logger.error(f"Column '{requirement_column}' not found. Available columns: {available_cols}")
+            logger.error(f"Column '{requirement_column}' not found. Available: {available_cols}")
             raise ValueError(f"Column '{requirement_column}' not found in CSV")
         
+        # Ensure we have required columns per conventions.md
+        if 'ID' not in df.columns:
+            df['ID'] = [f"REQ_{i:04d}" for i in range(len(df))]
+        
+        # Get Requirement Name if available
+        req_name_col = 'Requirement Name' if 'Requirement Name' in df.columns else None
+        
         df = df.fillna({requirement_column: ""})
-        logger.info(f"Analyzing {len(df)} requirements with enhanced NLP...")
+        logger.info(f"Analyzing {len(df)} requirements...")
         
         # Analyze each requirement
-        analysis_results = []
-        metrics_list = []
-        incose_results = []
-        semantic_results = []
+        all_analysis_results = []
         
-        requirements_text = df[requirement_column].tolist()
-        
-        for idx, requirement in enumerate(requirements_text):
-            req_id = df.get("ID", pd.Series([f"REQ_{idx:04d}"] * len(df))).iloc[idx]
-            issues, metrics, incose_analysis, semantic_analysis = self.analyze_requirement(requirement, str(req_id))
+        for idx, row in df.iterrows():
+            req_id = row['ID']
+            req_text = row[requirement_column]
+            req_name = row[req_name_col] if req_name_col else ""
             
-            analysis_results.append(issues)
-            metrics_list.append(metrics)
-            incose_results.append(incose_analysis)
-            semantic_results.append(semantic_analysis)
+            issues, metrics, incose_analysis, semantic_analysis = self.analyze_requirement(req_text, req_id)
+            
+            # Build comprehensive result
+            result = {
+                # Core columns
+                'ID': req_id,
+                'Requirement Name': req_name,
+                'Requirement Text': req_text,
+                
+                # Quality scores
+                'Quality_Score': metrics.clarity_score * 0.2 + metrics.completeness_score * 0.2 + 
+                                metrics.verifiability_score * 0.2 + metrics.atomicity_score * 0.2 + 
+                                metrics.consistency_score * 0.2,
+                'Quality_Grade': self._get_grade(metrics.clarity_score * 0.2 + metrics.completeness_score * 0.2 + 
+                                                metrics.verifiability_score * 0.2 + metrics.atomicity_score * 0.2 + 
+                                                metrics.consistency_score * 0.2),
+                
+                # Quality breakdown
+                'Clarity_Score': metrics.clarity_score,
+                'Completeness_Score': metrics.completeness_score,
+                'Verifiability_Score': metrics.verifiability_score,
+                'Atomicity_Score': metrics.atomicity_score,
+                'Consistency_Score': metrics.consistency_score,
+                
+                # Issues
+                'Total_Issues': metrics.total_issues,
+                'Critical_Issues': metrics.severity_breakdown['critical'],
+                'High_Issues': metrics.severity_breakdown['high'],
+                'Medium_Issues': metrics.severity_breakdown['medium'],
+                'Low_Issues': metrics.severity_breakdown['low'],
+                'Issue_Details': '; '.join(issues),
+                
+                # INCOSE analysis
+                'INCOSE_Compliance_Score': incose_analysis.compliance_score,
+                'INCOSE_Best_Pattern': incose_analysis.best_pattern,
+                'INCOSE_Missing_Required': ', '.join(incose_analysis.missing_required) if incose_analysis.missing_required else 'None',
+                'INCOSE_Missing_Optional': ', '.join(incose_analysis.missing_optional) if incose_analysis.missing_optional else 'None',
+                'INCOSE_Template': incose_analysis.template_recommendation,
+                'INCOSE_Suggestions': '; '.join(incose_analysis.suggestions),
+                
+                # INCOSE Components found
+                'Has_Agent': 'Yes' if incose_analysis.components_found.get('AGENT') else 'No',
+                'Has_Function': 'Yes' if incose_analysis.components_found.get('FUNCTION') else 'No',
+                'Has_Performance': 'Yes' if incose_analysis.components_found.get('PERFORMANCE') else 'No',
+                'Has_Condition': 'Yes' if incose_analysis.components_found.get('CONDITION') else 'No',
+                
+                # Semantic analysis
+                'Semantic_Quality_Score': metrics.semantic_quality_score,
+                'Actors_Found': ', '.join(semantic_analysis.entity_completeness.get('actors', [])) if semantic_analysis.entity_completeness.get('actors') else 'None',
+                'Actions_Found': ', '.join(semantic_analysis.entity_completeness.get('actions', [])) if semantic_analysis.entity_completeness.get('actions') else 'None',
+                'Objects_Found': ', '.join(semantic_analysis.entity_completeness.get('objects', [])) if semantic_analysis.entity_completeness.get('objects') else 'None',
+                'Conditions_Found': ', '.join(semantic_analysis.entity_completeness.get('conditions', [])) if semantic_analysis.entity_completeness.get('conditions') else 'None',
+                
+                'Ambiguous_Terms': '; '.join(semantic_analysis.contextual_ambiguities) if semantic_analysis.contextual_ambiguities else 'None',
+                'Tone_Issues': '; '.join(semantic_analysis.tone_issues) if semantic_analysis.tone_issues else 'None',
+                'Semantic_Suggestions': '; '.join(semantic_analysis.improvement_suggestions) if semantic_analysis.improvement_suggestions else 'None',
+                
+                # Will be filled after similarity analysis
+                'Similar_Requirements': 0,
+                'Most_Similar_ID': 'None',
+                'Max_Similarity': 0.0,
+                'Duplicate_Group': 'UNIQUE'
+            }
+            
+            all_analysis_results.append(result)
             
             if (idx + 1) % 50 == 0:
                 logger.info(f"Processed {idx + 1}/{len(df)} requirements")
         
-        # Find similar requirements (batch analysis)
-        print("🔍 Analyzing requirement similarities...")
-        similarity_results = self.semantic_analyzer.find_similar_requirements(requirements_text)
+        # Create results DataFrame
+        results_df = pd.DataFrame(all_analysis_results)
         
-        # Add similarity issues to semantic results
+        # Find similar requirements
+        logger.info("Finding similar requirements...")
+        req_texts = df[requirement_column].tolist()
+        similarity_results = self.semantic_analyzer.find_similar_requirements(req_texts)
+        
+        # Update similarity information
+        similarity_map = {}
         for sim_result in similarity_results:
             idx1, idx2 = sim_result['req1_index'], sim_result['req2_index']
-            semantic_results[idx1].similarity_issues.append(sim_result)
-            semantic_results[idx2].similarity_issues.append(sim_result)
-        
-        # Build enhanced DataFrame
-        df = self._build_enhanced_dataframe(df, analysis_results, metrics_list, incose_results, semantic_results)
-        
-        # Generate reports
-        output_file = self._save_enhanced_results(df, input_file_path, output_file, excel_report)
-        
-        # Print enhanced summary
-        self._print_enhanced_summary(df, similarity_results)
-        
-        return df
-    
-    def _build_enhanced_dataframe(self, df: pd.DataFrame, analysis_results: List, 
-                                 metrics_list: List, incose_results: List, 
-                                 semantic_results: List) -> pd.DataFrame:
-        """Build enhanced DataFrame with all analysis results"""
-        
-        # Add basic analysis results
-        df["Issues"] = analysis_results
-        df["Total_Issues"] = [len(issues) for issues in analysis_results]
-        
-        # Add quality scores
-        df["Clarity_Score"] = [m.clarity_score for m in metrics_list]
-        df["Completeness_Score"] = [m.completeness_score for m in metrics_list]
-        df["Verifiability_Score"] = [m.verifiability_score for m in metrics_list]
-        df["Atomicity_Score"] = [m.atomicity_score for m in metrics_list]
-        df["Consistency_Score"] = [m.consistency_score for m in metrics_list]
-        df["INCOSE_Compliance_Score"] = [m.incose_compliance_score for m in metrics_list]
-        df["Semantic_Quality_Score"] = [m.semantic_quality_score for m in metrics_list]
-        
-        # Add severity breakdowns
-        df["Critical_Issues"] = [m.severity_breakdown.get("critical", 0) for m in metrics_list]
-        df["High_Issues"] = [m.severity_breakdown.get("high", 0) for m in metrics_list]
-        df["Medium_Issues"] = [m.severity_breakdown.get("medium", 0) for m in metrics_list]
-        df["Low_Issues"] = [m.severity_breakdown.get("low", 0) for m in metrics_list]
-        
-        # Add INCOSE analysis
-        df["INCOSE_Best_Pattern"] = [incose.best_pattern for incose in incose_results]
-        df["INCOSE_Missing_Required"] = [", ".join(incose.missing_required) for incose in incose_results]
-        df["INCOSE_Suggestions"] = ["; ".join(incose.suggestions) for incose in incose_results]
-        
-        # Add semantic analysis
-        df["Similarity_Issues"] = [len(semantic.similarity_issues) for semantic in semantic_results]
-        df["Contextual_Ambiguities"] = [len(semantic.contextual_ambiguities) for semantic in semantic_results]
-        df["Tone_Issues"] = [len(semantic.tone_issues) for semantic in semantic_results]
-        
-        # Calculate enhanced quality score
-        df["Quality_Score"] = (
-            df["Clarity_Score"] * 0.25 +           # Reduced
-            df["Completeness_Score"] * 0.25 +      # Reduced
-            df["Verifiability_Score"] * 0.30 +     # Still most important
-            df["Atomicity_Score"] * 0.10 +         # Reduced
-            df["Consistency_Score"] * 0.05 +       # Reduced
-            df["Semantic_Quality_Score"] * 0.05    # New: Semantic quality
-        )
-        
-        # Apply enhanced penalties
-        def apply_enhanced_penalty(row):
-            base_score = row["Quality_Score"]
             
-            # Standard penalties
-            penalty = (row["Critical_Issues"] * 25 + row["High_Issues"] * 15 + 
-                      row["Medium_Issues"] * 5 + row["Low_Issues"] * 2)
+            # Map to IDs
+            id1 = results_df.iloc[idx1]['ID']
+            id2 = results_df.iloc[idx2]['ID']
             
-            # Additional penalties
-            if row["Total_Issues"] > 3:
-                penalty += (row["Total_Issues"] - 3) * 10
+            if id1 not in similarity_map:
+                similarity_map[id1] = []
+            if id2 not in similarity_map:
+                similarity_map[id2] = []
             
-            # INCOSE penalties
-            if row["INCOSE_Compliance_Score"] < 50:
-                penalty += 20
-            
-            # Similarity penalties
-            if row["Similarity_Issues"] > 0:
-                penalty += row["Similarity_Issues"] * 10
-            
-            return max(0, base_score - penalty)
+            similarity_map[id1].append((id2, sim_result['similarity']))
+            similarity_map[id2].append((id1, sim_result['similarity']))
         
-        df["Quality_Score"] = df.apply(apply_enhanced_penalty, axis=1)
+        # Update similarity columns
+        for idx, row in results_df.iterrows():
+            req_id = row['ID']
+            if req_id in similarity_map:
+                similar_reqs = similarity_map[req_id]
+                results_df.at[idx, 'Similar_Requirements'] = len(similar_reqs)
+                if similar_reqs:
+                    most_similar = max(similar_reqs, key=lambda x: x[1])
+                    results_df.at[idx, 'Most_Similar_ID'] = most_similar[0]
+                    results_df.at[idx, 'Max_Similarity'] = most_similar[1]
         
-        # Enhanced grade assignment
-        def assign_enhanced_grade(score):
-            if score >= 95:
-                return "EXCELLENT"
-            elif score >= 85:
-                return "GOOD"
-            elif score >= 70:
-                return "FAIR"
-            elif score >= 50:
-                return "POOR"
-            else:
-                return "CRITICAL"
+        # Add duplicate groups
+        results_df = self._add_duplicate_groups(results_df, similarity_map)
         
-        df["Quality_Grade"] = df["Quality_Score"].apply(assign_enhanced_grade)
+        # Save CSV results
+        if output_file is None:
+            output_file = Path(input_file_path).stem + "_quality_analysis"
         
-        return df
+        csv_path = Path(output_file).with_suffix('.csv')
+        results_df.to_csv(csv_path, index=False)
+        logger.info(f"Saved CSV results to {csv_path}")
+        
+        # Create Excel report if requested
+        if excel_report:
+            excel_path = self._create_excel_report(results_df, output_file)
+            logger.info(f"Created Excel report: {excel_path}")
+        
+        # Print summary
+        self._print_summary(results_df)
+        
+        return results_df
     
     def _save_enhanced_results(self, df: pd.DataFrame, input_file_path: str, 
                               output_file: str, excel_report: bool) -> str:
@@ -998,499 +957,318 @@ class EnhancedRequirementAnalyzer:
         
         return output_file
     
-    def _generate_enhanced_summary(self, df: pd.DataFrame) -> Dict:
-        """Generate enhanced summary with INCOSE and semantic metrics"""
-        
-        total_reqs = len(df)
-        reqs_with_issues = len(df[df["Total_Issues"] > 0])
-        
-        # Basic metrics
-        summary = {
-            "basic_metrics": {
-                "total_requirements": total_reqs,
-                "requirements_with_issues": reqs_with_issues,
-                "issue_rate": (reqs_with_issues / total_reqs * 100) if total_reqs > 0 else 0,
-                "average_quality_score": df["Quality_Score"].mean()
-            },
-            "severity_breakdown": {
-                "critical": int(df["Critical_Issues"].sum()),
-                "high": int(df["High_Issues"].sum()),
-                "medium": int(df["Medium_Issues"].sum()),
-                "low": int(df["Low_Issues"].sum())
-            },
-            "incose_analysis": {
-                "average_compliance": df["INCOSE_Compliance_Score"].mean(),
-                "pattern_distribution": df["INCOSE_Best_Pattern"].value_counts().to_dict(),
-                "low_compliance_count": len(df[df["INCOSE_Compliance_Score"] < 70])
-            },
-            "semantic_analysis": {
-                "average_semantic_score": df["Semantic_Quality_Score"].mean(),
-                "similarity_issues_count": int(df["Similarity_Issues"].sum()),
-                "contextual_ambiguities_count": int(df["Contextual_Ambiguities"].sum()),
-                "tone_issues_count": int(df["Tone_Issues"].sum())
-            },
-            "quality_distribution": df["Quality_Grade"].value_counts().to_dict()
-        }
-        
-        return summary
+    def _get_grade(self, score: float) -> str:
+        """Convert score to grade."""
+        if score >= 90:
+            return 'EXCELLENT'
+        elif score >= 75:
+            return 'GOOD'
+        elif score >= 60:
+            return 'FAIR'
+        elif score >= 40:
+            return 'POOR'
+        else:
+            return 'CRITICAL'
     
-    def _create_enhanced_excel_report(self, df: pd.DataFrame) -> str:
-        """Create enhanced Excel report with INCOSE and semantic tabs"""
+    def _add_duplicate_groups(self, df: pd.DataFrame, similarity_map: Dict[str, List[Tuple[str, float]]]) -> pd.DataFrame:
+        """Add duplicate group IDs."""
+        groups = {}
+        group_id = 1
+        processed = set()
         
+        for req_id, similar_reqs in similarity_map.items():
+            if req_id in processed:
+                continue
+            
+            # Find all requirements with >95% similarity
+            group_members = {req_id}
+            for sim_id, sim_score in similar_reqs:
+                if sim_score >= 0.95:
+                    group_members.add(sim_id)
+            
+            if len(group_members) > 1:
+                for member in group_members:
+                    groups[member] = f"DUP_GROUP_{group_id:03d}"
+                    processed.add(member)
+                group_id += 1
+        
+        # Map to DataFrame
+        df['Duplicate_Group'] = df['ID'].map(groups).fillna('UNIQUE')
+        
+        return df
+    
+    def _create_excel_report(self, df: pd.DataFrame, base_filename: str) -> Path:
+        """Create comprehensive 4-tab Excel report."""
         output_file = self.file_handler.get_structured_path(
             'quality_analysis', 
-            "enhanced_requirements_quality_report.xlsx"
+            "requirements_quality_report.xlsx"
         )
         
-        output_path = Path(output_file)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-            # Enhanced Dashboard
-            dashboard = self._create_enhanced_dashboard_tab(df)
-            dashboard.to_excel(writer, sheet_name='Enhanced Dashboard', index=False)
+        excel_path = Path(output_file)
+        excel_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with pd.ExcelWriter(excel_path, engine='openpyxl') as writer:
+            # Tab 1: Summary
+            summary_df = self._create_summary_tab(df)
+            summary_df.to_excel(writer, sheet_name='Summary', index=False)
             
-            # INCOSE Analysis Tab
-            incose_tab = self._create_incose_analysis_tab(df)
-            incose_tab.to_excel(writer, sheet_name='INCOSE Analysis', index=False)
+            # Tab 2: Quality Grading
+            quality_cols = [
+                'ID', 'Requirement Name', 'Requirement Text',
+                'Quality_Score', 'Quality_Grade',
+                'Clarity_Score', 'Completeness_Score', 'Verifiability_Score', 
+                'Atomicity_Score', 'Consistency_Score',
+                'Total_Issues', 'Critical_Issues', 'High_Issues', 'Medium_Issues', 'Low_Issues',
+                'Issue_Details'
+            ]
+            quality_df = df[quality_cols]
+            quality_df.to_excel(writer, sheet_name='Quality Grading', index=False)
             
-            # Semantic Analysis Tab
-            semantic_tab = self._create_semantic_analysis_tab(df)
-            semantic_tab.to_excel(writer, sheet_name='Semantic Analysis', index=False)
+            # Tab 3: INCOSE Analysis
+            incose_cols = [
+                'ID', 'Requirement Name', 'Requirement Text',
+                'INCOSE_Compliance_Score', 'INCOSE_Best_Pattern',
+                'Has_Agent', 'Has_Function', 'Has_Performance', 'Has_Condition',
+                'INCOSE_Missing_Required', 'INCOSE_Missing_Optional', 'INCOSE_Suggestions'
+            ]
+            incose_df = df[incose_cols]
+            incose_df.to_excel(writer, sheet_name='INCOSE Analysis', index=False)
             
-            # Critical Issues (Enhanced)
-            critical_tab = self._create_enhanced_critical_tab(df)
-            critical_tab.to_excel(writer, sheet_name='Critical Issues', index=False)
+            # Tab 4: Semantic Analysis
+            semantic_cols = [
+                'ID', 'Requirement Name', 'Requirement Text',
+                'Semantic_Quality_Score',
+                'Actors_Found', 'Actions_Found', 'Objects_Found', 'Conditions_Found',
+                'Ambiguous_Terms', 'Tone_Issues',
+                'Similar_Requirements', 'Most_Similar_ID', 'Max_Similarity', 'Duplicate_Group',
+                'Semantic_Suggestions'
+            ]
+            semantic_df = df[semantic_cols]
+            semantic_df.to_excel(writer, sheet_name='Semantic Analysis', index=False)
             
-            # Detailed Results
-            df.to_excel(writer, sheet_name='Detailed Results', index=False)
-            
-            # Apply formatting
-            try:
-                self._format_enhanced_excel(writer)
-            except Exception as e:
-                logger.warning(f"Excel formatting failed: {e}")
-        
-        return str(output_path)
-    
-    def _create_enhanced_dashboard_tab(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create enhanced dashboard with INCOSE and semantic metrics"""
-        
-        total_reqs = len(df)
-        dashboard_data = []
-        
-        # Basic metrics
-        avg_quality = df['Quality_Score'].mean()
-        dashboard_data.extend([
-            {"Category": "Overview", "Metric": "Total Requirements", "Value": total_reqs, "Status": "✓"},
-            {"Category": "Overview", "Metric": "Average Quality Score", "Value": f"{avg_quality:.1f}/100", 
-             "Status": "✓" if avg_quality >= 80 else "⚠️" if avg_quality >= 70 else "❌"},
-        ])
-        
-        # INCOSE metrics
-        avg_incose = df['INCOSE_Compliance_Score'].mean()
-        low_incose = len(df[df['INCOSE_Compliance_Score'] < 70])
-        dashboard_data.extend([
-            {"Category": "INCOSE", "Metric": "Average INCOSE Compliance", "Value": f"{avg_incose:.1f}/100",
-             "Status": "✓" if avg_incose >= 80 else "⚠️" if avg_incose >= 60 else "❌"},
-            {"Category": "INCOSE", "Metric": "Low Compliance Requirements", "Value": low_incose,
-             "Status": "✓" if low_incose < total_reqs * 0.1 else "❌"},
-        ])
-        
-        # Semantic metrics
-        similarity_issues = df['Similarity_Issues'].sum()
-        avg_semantic = df['Semantic_Quality_Score'].mean()
-        dashboard_data.extend([
-            {"Category": "Semantic", "Metric": "Average Semantic Score", "Value": f"{avg_semantic:.1f}/100",
-             "Status": "✓" if avg_semantic >= 80 else "⚠️"},
-            {"Category": "Semantic", "Metric": "Potential Duplicates", "Value": int(similarity_issues),
-             "Status": "✓" if similarity_issues == 0 else "⚠️"},
-        ])
-        
-        # Quality grades
-        grades = df['Quality_Grade'].value_counts()
-        for grade in ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'CRITICAL']:
-            count = grades.get(grade, 0)
-            pct = count / total_reqs * 100
-            dashboard_data.append({
-                "Category": "Grades",
-                "Metric": f"{grade} Requirements", 
-                "Value": f"{count} ({pct:.1f}%)",
-                "Status": "✓" if grade in ['EXCELLENT', 'GOOD'] else "⚠️" if grade == 'FAIR' else "❌"
-            })
-        
-        return pd.DataFrame(dashboard_data)
-    
-    def _create_incose_analysis_tab(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create INCOSE-specific analysis tab"""
-        
-        incose_data = []
-        
-        # Pattern distribution
-        pattern_counts = df['INCOSE_Best_Pattern'].value_counts()
-        for pattern, count in pattern_counts.items():
-            avg_compliance = df[df['INCOSE_Best_Pattern'] == pattern]['INCOSE_Compliance_Score'].mean()
-            incose_data.append({
-                "Analysis_Type": "Pattern Distribution",
-                "Pattern": pattern,
-                "Count": count,
-                "Percentage": f"{count/len(df)*100:.1f}%",
-                "Avg_Compliance": f"{avg_compliance:.1f}",
-                "Status": "✓" if avg_compliance >= 80 else "⚠️" if avg_compliance >= 60 else "❌"
-            })
-        
-        # Compliance analysis
-        compliance_ranges = [
-            ("Excellent (90-100)", len(df[df['INCOSE_Compliance_Score'] >= 90])),
-            ("Good (80-89)", len(df[(df['INCOSE_Compliance_Score'] >= 80) & (df['INCOSE_Compliance_Score'] < 90)])),
-            ("Fair (70-79)", len(df[(df['INCOSE_Compliance_Score'] >= 70) & (df['INCOSE_Compliance_Score'] < 80)])),
-            ("Poor (50-69)", len(df[(df['INCOSE_Compliance_Score'] >= 50) & (df['INCOSE_Compliance_Score'] < 70)])),
-            ("Critical (<50)", len(df[df['INCOSE_Compliance_Score'] < 50]))
-        ]
-        
-        for range_name, count in compliance_ranges:
-            incose_data.append({
-                "Analysis_Type": "Compliance Range",
-                "Pattern": range_name,
-                "Count": count,
-                "Percentage": f"{count/len(df)*100:.1f}%",
-                "Avg_Compliance": "",
-                "Status": "✓" if "Excellent" in range_name or "Good" in range_name else "⚠️" if "Fair" in range_name else "❌"
-            })
-        
-        return pd.DataFrame(incose_data)
-    
-    def _create_semantic_analysis_tab(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create semantic analysis tab"""
-        
-        semantic_data = []
-        
-        # Similarity issues
-        similarity_issues = df['Similarity_Issues'].sum()
-        if similarity_issues > 0:
-            semantic_data.append({
-                "Issue_Type": "Potential Duplicates",
-                "Count": int(similarity_issues),
-                "Severity": "Medium",
-                "Recommendation": "Review similar requirements for consolidation",
-                "Action": "Manual review required"
-            })
-        
-        # Contextual ambiguities
-        ambiguity_count = df['Contextual_Ambiguities'].sum()
-        if ambiguity_count > 0:
-            semantic_data.append({
-                "Issue_Type": "Contextual Ambiguities",
-                "Count": int(ambiguity_count),
-                "Severity": "High",
-                "Recommendation": "Replace ambiguous terms with specific criteria",
-                "Action": "Add measurable thresholds"
-            })
-        
-        # Tone issues
-        tone_count = df['Tone_Issues'].sum()
-        if tone_count > 0:
-            semantic_data.append({
-                "Issue_Type": "Tone Issues",
-                "Count": int(tone_count),
-                "Severity": "Medium",
-                "Recommendation": "Use neutral, technical language",
-                "Action": "Remove subjective terms"
-            })
-        
-        return pd.DataFrame(semantic_data)
-    
-    def _create_enhanced_critical_tab(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Create enhanced critical issues tab"""
-        
-        # Filter for critical requirements
-        critical_filter = (
-            (df['Critical_Issues'] > 0) | 
-            (df['High_Issues'] > 0) | 
-            (df['Quality_Score'] < 50) |
-            (df['INCOSE_Compliance_Score'] < 50) |
-            (df['Similarity_Issues'] > 0)
-        )
-        
-        critical_reqs = df[critical_filter].copy()
-        
-        if len(critical_reqs) == 0:
-            return pd.DataFrame([{"Message": "No critical issues found!"}])
-        
-        # Select key columns
-        columns_to_include = [
-            'ID', 'Quality_Score', 'Quality_Grade', 'INCOSE_Compliance_Score', 
-            'INCOSE_Best_Pattern', 'Similarity_Issues', 'Issues'
-        ]
-        
-        available_cols = [col for col in columns_to_include if col in critical_reqs.columns]
-        critical_issues = critical_reqs[available_cols].copy()
-        
-        # Sort by worst quality first
-        critical_issues = critical_issues.sort_values('Quality_Score')
-        
-        # Add enhanced action columns
-        critical_issues['Priority'] = critical_issues.apply(
-            lambda row: 'CRITICAL' if row.get('Quality_Score', 100) < 35 else 'HIGH', axis=1
-        )
-        critical_issues['Primary_Issue'] = critical_issues.apply(
-            lambda row: self._identify_primary_issue(row), axis=1
-        )
-        critical_issues['Action_Status'] = 'PENDING'
-        critical_issues['Assigned_To'] = ''
-        
-        return critical_issues
-    
-    def _identify_primary_issue(self, row) -> str:
-        """Identify the primary issue for a requirement"""
-        if row.get('INCOSE_Compliance_Score', 100) < 50:
-            return "INCOSE Pattern Compliance"
-        elif row.get('Similarity_Issues', 0) > 0:
-            return "Potential Duplicate"
-        elif row.get('Quality_Score', 100) < 35:
-            return "Multiple Quality Issues"
-        else:
-            return "Needs Review"
-    
-    def _format_enhanced_excel(self, writer):
-        """Apply enhanced formatting to Excel workbook"""
-        try:
-            from openpyxl.styles import PatternFill, Font, Alignment
-            
+            # Format worksheets
             workbook = writer.book
-            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-            header_font = Font(color="FFFFFF", bold=True)
-            
             for sheet_name in workbook.sheetnames:
                 worksheet = workbook[sheet_name]
                 
                 # Format headers
-                if worksheet.max_row > 0:
-                    for cell in worksheet[1]:
-                        cell.fill = header_fill
-                        cell.font = header_font
-                        cell.alignment = Alignment(horizontal="center")
+                for cell in worksheet[1]:
+                    cell.font = Font(bold=True)
+                    cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+                    cell.font = Font(color="FFFFFF", bold=True)
                 
-                # Auto-adjust columns
+                # Auto-adjust column widths
                 for column in worksheet.columns:
                     max_length = 0
                     column_letter = column[0].column_letter
-                    
                     for cell in column:
                         try:
                             if len(str(cell.value)) > max_length:
                                 max_length = len(str(cell.value))
                         except:
                             pass
-                    
-                    adjusted_width = min(max_length + 2, 60)
+                    adjusted_width = min(max_length + 2, 50)
                     worksheet.column_dimensions[column_letter].width = adjusted_width
-                    
-        except ImportError:
-            logger.warning("openpyxl not available for enhanced formatting")
+        
+        return excel_path
     
-    def _print_enhanced_summary(self, df: pd.DataFrame, similarity_results: List):
-        """Print enhanced analysis summary"""
+    def _create_summary_tab(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Create comprehensive summary tab with methodology."""
+        summary_data = []
         
-        print("\n" + "="*60)
-        print("ENHANCED REQUIREMENTS QUALITY ANALYSIS SUMMARY")
-        print("="*60)
+        # Overall Statistics
+        summary_data.extend([
+            {'Section': 'OVERALL STATISTICS', 'Metric': '', 'Value': '', 'Details': ''},
+            {'Section': '', 'Metric': 'Total Requirements', 'Value': len(df), 'Details': ''},
+            {'Section': '', 'Metric': 'Average Quality Score', 'Value': f"{df['Quality_Score'].mean():.1f}/100", 'Details': ''},
+            {'Section': '', 'Metric': 'Average INCOSE Compliance', 'Value': f"{df['INCOSE_Compliance_Score'].mean():.1f}%", 'Details': ''},
+            {'Section': '', 'Metric': 'Average Semantic Score', 'Value': f"{df['Semantic_Quality_Score'].mean():.1f}/100", 'Details': ''},
+            {'Section': '', 'Metric': '', 'Value': '', 'Details': ''},
+        ])
         
-        # Basic metrics
-        total_reqs = len(df)
-        avg_quality = df["Quality_Score"].mean()
-        print(f"📊 Total Requirements: {total_reqs}")
-        print(f"📈 Average Quality Score: {avg_quality:.1f}/100")
-        
-        # Grade distribution
-        grades = df["Quality_Grade"].value_counts()
-        print(f"\n🎯 Quality Distribution:")
+        # Grade Distribution
+        summary_data.append({'Section': 'GRADE DISTRIBUTION', 'Metric': '', 'Value': '', 'Details': ''})
+        grades = df['Quality_Grade'].value_counts()
         for grade in ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'CRITICAL']:
             count = grades.get(grade, 0)
-            pct = count / total_reqs * 100
-            print(f"   {grade}: {count} ({pct:.1f}%)")
+            pct = count / len(df) * 100 if len(df) > 0 else 0
+            summary_data.append({
+                'Section': '',
+                'Metric': f'{grade} Requirements',
+                'Value': f'{count} ({pct:.1f}%)',
+                'Details': self._get_grade_description(grade)
+            })
+        summary_data.append({'Section': '', 'Metric': '', 'Value': '', 'Details': ''})
         
-        # INCOSE analysis
-        avg_incose = df["INCOSE_Compliance_Score"].mean()
-        low_incose = len(df[df["INCOSE_Compliance_Score"] < 70])
-        print(f"\n🏗️ INCOSE Pattern Analysis:")
-        print(f"   Low Compliance Requirements: {low_incose}")
-        
-        # Pattern distribution
-        pattern_dist = df["INCOSE_Best_Pattern"].value_counts()
-        print(f"   Most Common Pattern: {pattern_dist.index[0] if len(pattern_dist) > 0 else 'None'}")
-        
-        # Semantic analysis
-        avg_semantic = df["Semantic_Quality_Score"].mean()
-        similarity_count = len(similarity_results)
-        print(f"\n🧠 Semantic Analysis:")
-        print(f"   Average Semantic Score: {avg_semantic:.1f}/100")
-        print(f"   Potential Duplicates Found: {similarity_count}")
-        
-        if similarity_count > 0:
-            print(f"   Top Similarity Pair: {similarity_results[0]['similarity']:.2f}")
-        
-        # Issue severity breakdown
-        critical_issues = df["Critical_Issues"].sum()
-        high_issues = df["High_Issues"].sum()
-        medium_issues = df["Medium_Issues"].sum()
-        low_issues = df["Low_Issues"].sum()
-        
-        print(f"\n⚠️ Issue Severity Breakdown:")
-        print(f"   Critical: {critical_issues}")
-        print(f"   High: {high_issues}")
-        print(f"   Medium: {medium_issues}")
-        print(f"   Low: {low_issues}")
-        
-        # Top issues by category
-        print(f"\n🔍 Top Issue Categories:")
+        # Top Issues
+        summary_data.append({'Section': 'TOP ISSUES', 'Metric': '', 'Value': '', 'Details': ''})
         all_issues = []
-        for issues_list in df["Issues"]:
-            all_issues.extend(issues_list)
+        for issues_text in df['Issue_Details']:
+            if issues_text and str(issues_text) != 'nan':
+                issues = issues_text.split(';')
+                for issue in issues:
+                    if ':' in issue:
+                        issue_type = issue.split(':')[0].strip()
+                        all_issues.append(issue_type)
         
         if all_issues:
-            # Extract issue categories
-            issue_categories = []
-            for issue in all_issues:
-                if ":" in issue:
-                    category = issue.split(":")[0].strip()
-                    issue_categories.append(category)
-            
-            if issue_categories:
-                category_counts = Counter(issue_categories)
-                for category, count in category_counts.most_common(5):
-                    print(f"   {category}: {count}")
+            issue_counts = Counter(all_issues)
+            for issue_type, count in issue_counts.most_common(5):
+                summary_data.append({
+                    'Section': '',
+                    'Metric': issue_type,
+                    'Value': count,
+                    'Details': ''
+                })
+        summary_data.append({'Section': '', 'Metric': '', 'Value': '', 'Details': ''})
         
-        # Recommendations
-        print(f"\n💡 Key Recommendations:")
-        if avg_incose < 70:
-            print(f"   • Improve INCOSE pattern compliance (current: {avg_incose:.1f}%)")
-        if similarity_count > 0:
-            print(f"   • Review {similarity_count} potential duplicate requirements")
-        if critical_issues > 0:
-            print(f"   • Address {critical_issues} critical issues immediately")
-        if high_issues > total_reqs * 0.2:
-            print(f"   • High issue rate ({high_issues}/{total_reqs}) needs attention")
+        # Duplicates
+        dup_count = len(df[df['Duplicate_Group'] != 'UNIQUE'])
+        summary_data.extend([
+            {'Section': 'DUPLICATE ANALYSIS', 'Metric': '', 'Value': '', 'Details': ''},
+            {'Section': '', 'Metric': 'Potential Duplicates', 'Value': dup_count, 'Details': 'Requirements with >95% similarity'},
+            {'Section': '', 'Metric': 'Duplicate Groups', 'Value': df[df['Duplicate_Group'] != 'UNIQUE']['Duplicate_Group'].nunique() if dup_count > 0 else 0, 'Details': ''},
+            {'Section': '', 'Metric': '', 'Value': '', 'Details': ''},
+        ])
         
-        print("="*60)
+        # Methodology
+        summary_data.extend([
+            {'Section': 'SCORING METHODOLOGY', 'Metric': '', 'Value': '', 'Details': ''},
+            {'Section': '', 'Metric': 'Quality Score Calculation', 'Value': '', 'Details': 'Average of 5 dimensions (Clarity, Completeness, Verifiability, Atomicity, Consistency)'},
+            {'Section': '', 'Metric': 'Issue Severity Weights', 'Value': '', 'Details': 'Critical: -10, High: -5, Medium: -2, Low: -1 points'},
+            {'Section': '', 'Metric': '', 'Value': '', 'Details': ''},
+        ])
+        
+        # Quality Dimensions
+        summary_data.extend([
+            {'Section': 'QUALITY DIMENSIONS', 'Metric': '', 'Value': '', 'Details': ''},
+            {'Section': '', 'Metric': 'Clarity', 'Value': '', 'Details': 'Unambiguous language, active voice, reasonable length'},
+            {'Section': '', 'Metric': 'Completeness', 'Value': '', 'Details': 'Has actor, action, modal verb (shall/must/should)'},
+            {'Section': '', 'Metric': 'Verifiability', 'Value': '', 'Details': 'Measurable, testable, has acceptance criteria'},
+            {'Section': '', 'Metric': 'Atomicity', 'Value': '', 'Details': 'Single requirement, not multiple bundled'},
+            {'Section': '', 'Metric': 'Consistency', 'Value': '', 'Details': 'Uses consistent terminology, appropriate modal verbs'},
+            {'Section': '', 'Metric': '', 'Value': '', 'Details': ''},
+        ])
+        
+        # INCOSE Patterns
+        summary_data.extend([
+            {'Section': 'INCOSE PATTERNS', 'Metric': '', 'Value': '', 'Details': ''},
+            {'Section': '', 'Metric': 'Functional/Performance', 'Value': '', 'Details': 'The {AGENT} shall {FUNCTION} in accordance with {INTERFACE_OUTPUT} with {PERFORMANCE} [and {TIMING} upon {EVENT_TRIGGER}] while in {CONDITION}'},
+            {'Section': '', 'Metric': 'Suitability', 'Value': '', 'Details': 'The {AGENT} shall exhibit {CHARACTERISTIC} with {PERFORMANCE} while {CONDITION} [for {CONDITION_DURATION}]'},
+            {'Section': '', 'Metric': 'Environmental', 'Value': '', 'Details': 'The {AGENT} shall exhibit {CHARACTERISTIC} during/after exposure to {ENVIRONMENT} [for {EXPOSURE_DURATION}]'},
+            {'Section': '', 'Metric': 'Design Constraint', 'Value': '', 'Details': 'The {AGENT} shall exhibit {DESIGN_CONSTRAINTS} [in accordance with {PERFORMANCE} while in {CONDITION}]'},
+            {'Section': '', 'Metric': '', 'Value': '', 'Details': ''},
+        ])
+        
+        # Semantic Checks
+        summary_data.extend([
+            {'Section': 'SEMANTIC ANALYSIS', 'Metric': '', 'Value': '', 'Details': ''},
+            {'Section': '', 'Metric': 'Ambiguous Terms', 'Value': '', 'Details': 'Words like: appropriate, various, several, many, some'},
+            {'Section': '', 'Metric': 'Entity Extraction', 'Value': '', 'Details': 'Identifies actors (who), actions (what), objects (on what)'},
+            {'Section': '', 'Metric': 'Implementation Details', 'Value': '', 'Details': 'Detects "how" vs "what": using, via, through + technology'},
+            {'Section': '', 'Metric': 'Similarity Threshold', 'Value': '95%', 'Details': 'For duplicate detection'},
+        ])
+        
+        return pd.DataFrame(summary_data)
+    
+    def _get_grade_description(self, grade: str) -> str:
+        """Get description for grade."""
+        descriptions = {
+            'EXCELLENT': 'Professional quality, ready for implementation',
+            'GOOD': 'Minor issues only, acceptable for most uses',
+            'FAIR': 'Several issues, needs improvement',
+            'POOR': 'Significant issues, requires major revision',
+            'CRITICAL': 'Severe issues, needs complete rewrite'
+        }
+        return descriptions.get(grade, '')
+    
+    def _print_summary(self, df: pd.DataFrame):
+        """Print analysis summary."""
+        print("\n" + "="*70)
+        print("REQUIREMENTS QUALITY ANALYSIS SUMMARY")
+        print("="*70)
+        print(f"\n📊 Overall Statistics:")
+        print(f"  Total Requirements: {len(df)}")
+        print(f"  Average Quality Score: {df['Quality_Score'].mean():.1f}/100")
+        print(f"  Average INCOSE Compliance: {df['INCOSE_Compliance_Score'].mean():.1f}%")
+        print(f"  Average Semantic Score: {df['Semantic_Quality_Score'].mean():.1f}/100")
+        
+        print(f"\n🎯 Grade Distribution:")
+        grades = df['Quality_Grade'].value_counts()
+        for grade in ['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'CRITICAL']:
+            count = grades.get(grade, 0)
+            pct = count / len(df) * 100 if len(df) > 0 else 0
+            print(f"  {grade}: {count} ({pct:.1f}%)")
+        
+        print(f"\n📋 Key Findings:")
+        print(f"  Requirements with issues: {len(df[df['Total_Issues'] > 0])}")
+        print(f"  Missing actors: {len(df[df['Actors_Found'] == 'None'])}")
+        print(f"  Missing modal verbs: {len(df[df['Has_Agent'] == 'No'])}")
+        print(f"  Potential duplicates: {len(df[df['Duplicate_Group'] != 'UNIQUE'])}")
+        
+        print("="*70)
 
 
 def main():
-    """Main function with automatic Excel generation."""
+    """Main function."""
     parser = argparse.ArgumentParser(
-        description="Enhanced Requirements Quality Analyzer v2.0 with INCOSE patterns and semantic analysis",
+        description="Enhanced Requirements Quality Analyzer with 4-Tab Excel Output",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python reqGrading.py                                    # Analyze requirements.csv (CSV + Excel)
-  python reqGrading.py -i my_reqs.csv                   # Analyze custom file
-  python reqGrading.py -c "Requirement" -m en_core_web_lg # Use different column and model
-  python reqGrading.py -v                                # Verbose mode
+  python reqGrading.py                    # Analyze requirements.csv
+  python reqGrading.py -i my_reqs.csv    # Analyze custom file
+  python reqGrading.py -c "Requirement"   # Use different column name
 
 Output:
-  • CSV file with detailed analysis
-  • Excel workbook with multiple tabs (automatically generated)
-  • JSON summary file
-
-Features:
-  • INCOSE pattern compliance analysis (informational)
-  • Semantic similarity detection (informational)
-  • Core quality metrics (affect scoring)
-  • Automated Excel report generation
+  • CSV file with all analysis results
+  • Excel workbook with 4 tabs:
+    - Summary: Overview and methodology
+    - Quality Grading: Traditional quality metrics
+    - INCOSE Analysis: Pattern compliance
+    - Semantic Analysis: Entities and similarity
         """
     )
     
     parser.add_argument("-i", "--input", dest="input_file", default="requirements.csv",
-                       help="Input CSV file containing requirements (default: requirements.csv)")
-    parser.add_argument("-o", "--output", help="Output file path (default: auto-generated)")
-    parser.add_argument("-c", "--column", default="Requirement Text", 
-                       help="Column name containing requirements (default: 'Requirement Text')")
-    parser.add_argument("-m", "--model", default="en_core_web_trf",
-                       help="spaCy model to use (default: en_core_web_trf)")
+                        help="Input CSV file with requirements")
+    parser.add_argument("-o", "--output", dest="output_file", default=None,
+                        help="Output filename (without extension)")
+    parser.add_argument("-c", "--column", dest="requirement_column", default="Requirement Text",
+                        help="Column name containing requirement text")
+    parser.add_argument("-m", "--model", dest="spacy_model", default="en_core_web_lg",
+                        help="spaCy model to use")
     parser.add_argument("-v", "--verbose", action="store_true",
-                       help="Enable verbose logging")
-    parser.add_argument("--no-excel", action="store_true",
-                       help="Skip Excel generation (CSV only)")
-    parser.add_argument("--similarity-threshold", type=float, default=0.85,
-                       help="Similarity threshold for duplicate detection (default: 0.85)")
+                        help="Enable verbose logging")
     
     args = parser.parse_args()
     
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
     
-    print("🚀 Enhanced Requirements Quality Analyzer v2.0")
-    print("=" * 50)
-    print(f"📁 Input file: {args.input_file}")
-    print(f"📝 Requirement column: {args.column}")
-    print(f"🤖 spaCy model: {args.model}")
-    print(f"📊 Excel report: {'No (--no-excel flag)' if args.no_excel else 'Yes (automatic)'}")
-    print(f"🔍 Similarity threshold: {args.similarity_threshold}")
-    print("=" * 50)
+    print("="*70)
+    print("🚀 ENHANCED REQUIREMENTS QUALITY ANALYZER v2.0")
+    print("="*70)
     
+    # Create analyzer
+    analyzer = EnhancedRequirementAnalyzer(spacy_model=args.spacy_model)
+    
+    # Run analysis
     try:
-        # Initialize enhanced analyzer
-        analyzer = EnhancedRequirementAnalyzer(args.model)
-        
-        # Set similarity threshold
-        analyzer.semantic_analyzer.similarity_threshold = args.similarity_threshold
-        
-        # Run enhanced analysis (Excel generated by default unless --no-excel)
-        result_df = analyzer.analyze_file(
-            args.input_file, 
-            args.output, 
-            args.column, 
-            excel_report=not args.no_excel  # Generate Excel by default
+        results_df = analyzer.analyze_file(
+            input_file=args.input_file,
+            output_file=args.output_file,
+            requirement_column=args.requirement_column,
+            excel_report=True
         )
         
-        print(f"\n✅ Enhanced analysis complete!")
-        print(f"📊 Analyzed {len(result_df)} requirements")
-        print(f"📈 Average quality score: {result_df['Quality_Score'].mean():.1f}/100")
-        
-        # Show outputs generated
-        print(f"\n📁 Generated Outputs:")
-        
-        # Determine output paths
-        if args.output:
-            csv_path = args.output
-            excel_path = str(Path(args.output).with_suffix('')) + '.xlsx'
-            summary_path = str(Path(args.output).with_suffix('')) + '_enhanced_summary.json'
-        else:
-            input_stem = Path(args.input_file).stem
-            csv_path = f"outputs/quality_analysis/{input_stem}_enhanced_quality_report.csv"
-            excel_path = f"outputs/quality_analysis/enhanced_requirements_quality_report.xlsx"
-            summary_path = f"outputs/quality_analysis/{input_stem}_enhanced_quality_report_enhanced_summary.json"
-        
-        print(f"   1. CSV analysis: {csv_path}")
-        if not args.no_excel:
-            print(f"   2. Excel workbook: {excel_path}")
-        print(f"   3. JSON summary: {summary_path}")
-        
-        # Show quick insights
-        critical_reqs = len(result_df[result_df['Quality_Grade'] == 'CRITICAL'])
-        if critical_reqs > 0:
-            print(f"\n⚠️ {critical_reqs} requirements need immediate attention")
-        
-        # Show INCOSE compliance (informational)
-        avg_incose = result_df['INCOSE_Compliance_Score'].mean()
-        print(f"\n📋 INCOSE Compliance (informational): {avg_incose:.1f}%")
-        
-        # Show duplicates (informational)
-        duplicates = result_df['Similarity_Issues'].sum()
-        if duplicates > 0:
-            print(f"🔍 Potential duplicates found (informational): {int(duplicates)} pairs")
-        
-        print(f"\n💡 Note: INCOSE and Semantic scores are informational only.")
-        print(f"   Core quality score based on: Clarity, Completeness, Verifiability, Atomicity, Consistency")
-        
-        print("\nReview the generated files for detailed analysis and recommendations.")
-        
-    except FileNotFoundError as e:
-        print(f"\n❌ File not found: {e}")
-        print(f"💡 Please ensure the input file exists and the path is correct.")
+        print(f"\n✅ Analysis complete!")
+        output_name = args.output_file or Path(args.input_file).stem + "_quality_analysis"
+        print(f"📁 CSV results: {output_name}.csv")
+        print(f"📊 Excel report: {output_name}.xlsx")
         
     except Exception as e:
-        logger.error(f"Enhanced analysis failed: {e}")
+        logger.error(f"Analysis failed: {e}")
         raise
 
 

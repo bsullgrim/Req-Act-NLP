@@ -372,7 +372,7 @@ class FixedSimpleEvaluator:
         return text.strip().lower().replace("-", " ")
     
     def _compute_metrics_enhanced(self, matches_df: pd.DataFrame, ground_truth: Dict, 
-                                 score_col: str, req_col: str, act_col: str) -> Dict:
+                                score_col: str, req_col: str, act_col: str) -> Dict:
         """Enhanced metrics computation with detailed debugging."""
         
         # Group matches by requirement
@@ -425,7 +425,7 @@ class FixedSimpleEvaluator:
                 matches_in_top5 = len(set(top5_activities) & set(gt_normalized))
                 print(f"   🎯 Matches in top 5: {matches_in_top5}/{len(gt_normalized)}")
         
-        # Compute metrics for different k values
+        # Compute ORIGINAL metrics for different k values
         k_values = [1, 3, 5]
         metrics = {}
         
@@ -485,6 +485,10 @@ class FixedSimpleEvaluator:
         metrics['perfect_match_rate'] = perfect_matches / total_evaluated if total_evaluated > 0 else 0
         metrics['avg_top5_coverage'] = np.mean(top5_coverage) if top5_coverage else 0
         
+        # ADD NEW: Compute supplementary metrics
+        supplementary = self._compute_supplementary_metrics(matches_by_req, ground_truth)
+        metrics.update(supplementary)  # Add to main metrics dict
+        
         print(f"\n   📊 QUICK METRICS PREVIEW:")
         print(f"      F1@1: {metrics['f1_at_1']:.3f}")
         print(f"      F1@5: {metrics['f1_at_5']:.3f}")
@@ -492,7 +496,220 @@ class FixedSimpleEvaluator:
         print(f"      Perfect matches: {perfect_matches}/{total_evaluated}")
         
         return metrics
-    
+
+    def _compute_supplementary_metrics(self, matches_by_req: dict, ground_truth: dict) -> dict:
+        """Compute supplementary metrics for practical insight."""
+        
+        # Initialize tracking
+        hit_at_k = {1: 0, 3: 0, 5: 0}
+        success_at_1 = 0
+        reciprocal_ranks = []
+        total_requirements = len(ground_truth)
+        
+        print(f"   📊 Computing supplementary metrics...")
+        
+        for req_id in ground_truth:
+            gt_normalized = [item['normalized'] for item in ground_truth[req_id]]
+            
+            if req_id in matches_by_req:
+                # Get predictions (already sorted by score)
+                predictions = [m['activity'] for m in matches_by_req[req_id]]
+                
+                # Find rank of first correct prediction
+                first_correct_rank = None
+                for i, pred in enumerate(predictions):
+                    if pred in gt_normalized:
+                        first_correct_rank = i + 1  # 1-indexed rank
+                        break
+                
+                # Hit@K: Does top-K contain at least one correct answer?
+                for k in [1, 3, 5]:
+                    top_k_preds = predictions[:k]
+                    if any(pred in gt_normalized for pred in top_k_preds):
+                        hit_at_k[k] += 1
+                
+                # Success@1: Is top prediction correct?
+                if len(predictions) > 0 and predictions[0] in gt_normalized:
+                    success_at_1 += 1
+                
+                # MRR: Reciprocal of rank of first correct answer
+                if first_correct_rank is not None:
+                    reciprocal_ranks.append(1.0 / first_correct_rank)
+                else:
+                    reciprocal_ranks.append(0.0)  # No correct answer found
+            else:
+                # No predictions for this requirement
+                reciprocal_ranks.append(0.0)
+        
+        # Calculate final metrics
+        supplementary = {
+            'hit_at_1': hit_at_k[1] / total_requirements,
+            'hit_at_3': hit_at_k[3] / total_requirements, 
+            'hit_at_5': hit_at_k[5] / total_requirements,
+            'success_at_1': success_at_1 / total_requirements,
+            'mrr': np.mean(reciprocal_ranks) if reciprocal_ranks else 0.0,
+            'total_requirements_evaluated': total_requirements
+        }
+        
+        print(f"   📊 Supplementary metrics preview:")
+        print(f"      Hit@5: {supplementary['hit_at_5']:.1%}")
+        print(f"      Success@1: {supplementary['success_at_1']:.1%}")
+        print(f"      MRR: {supplementary['mrr']:.3f}")
+        
+        return supplementary    
+
+    def _collect_run_metadata(self, file_paths: dict) -> dict:
+        """Collect comprehensive metadata about the current run including all tuning parameters."""
+        from datetime import datetime
+        import platform
+        import sys
+        
+        metadata = {
+            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'evaluator_version': 'Enhanced Simple Evaluator v2.0',
+            'python_version': sys.version.split()[0],
+            'platform': platform.platform(),
+            'file_paths': file_paths
+        }
+        
+        # Try to extract detailed matcher parameters from explanations file
+        explanations_file = file_paths.get('matches', '').replace('.csv', '_explanations.json')
+        if Path(explanations_file).exists():
+            try:
+                with open(explanations_file, 'r') as f:
+                    explanations_data = json.load(f)
+                    if explanations_data and len(explanations_data) > 0:
+                        sample = explanations_data[0]
+                        
+                        # Extract detailed scoring information
+                        metadata['matcher_info'] = {
+                            'has_explanations': True,
+                            'explanation_keys': list(sample.get('explanations', {}).keys()),
+                            'score_components': list(sample.get('scores', {}).keys()),
+                            'sample_explanations': {}
+                        }
+                        
+                        # Parse explanations for parameter hints
+                        explanations = sample.get('explanations', {})
+                        
+                        # Extract BM25 parameters from explanation text
+                        if 'bm25' in explanations:
+                            bm25_text = explanations['bm25']
+                            # Look for parameter patterns in explanation
+                            metadata['matcher_info']['bm25_details'] = bm25_text
+                            
+                        # Extract semantic model info
+                        if 'semantic' in explanations:
+                            semantic_text = explanations['semantic']
+                            metadata['matcher_info']['semantic_details'] = semantic_text
+                            
+                        # Extract domain scoring details
+                        if 'domain' in explanations:
+                            domain_text = explanations['domain']
+                            metadata['matcher_info']['domain_details'] = domain_text
+                            
+            except Exception as e:
+                print(f"   ⚠️ Could not parse explanations file: {e}")
+        
+        # Try to extract parameters from the matcher source files (if accessible)
+        matcher_files = ['matcher.py', 'src/matching/matcher.py', '../matcher.py']
+        for matcher_file in matcher_files:
+            if Path(matcher_file).exists():
+                try:
+                    with open(matcher_file, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        
+                    # Extract key parameters using regex
+                    parameters = {}
+                    
+                    # BM25 parameters
+                    import re
+                    
+                    # Look for k1 parameter
+                    k1_match = re.search(r'k1\s*[=:]\s*([0-9.]+)', content)
+                    if k1_match:
+                        parameters['bm25_k1'] = float(k1_match.group(1))
+                    
+                    # Look for b parameter  
+                    b_match = re.search(r'\bb\s*[=:]\s*([0-9.]+)', content)
+                    if b_match:
+                        parameters['bm25_b'] = float(b_match.group(1))
+                    
+                    # Look for similarity thresholds
+                    min_sim_matches = re.findall(r'min_similarity[^=]*[=:]\s*([0-9.]+)', content)
+                    if min_sim_matches:
+                        parameters['min_similarity'] = float(min_sim_matches[-1])  # Get last occurrence
+                    
+                    # Look for weights
+                    weights_section = re.search(r'weights\s*[=:]\s*\{([^}]+)\}', content, re.MULTILINE | re.DOTALL)
+                    if weights_section:
+                        weights_text = weights_section.group(1)
+                        # Parse individual weight components
+                        weight_matches = re.findall(r"['\"]?(\w+)['\"]?\s*:\s*([0-9.]+)", weights_text)
+                        if weight_matches:
+                            parameters['score_weights'] = {name: float(value) for name, value in weight_matches}
+                    
+                    # Look for default constants
+                    default_matches = re.findall(r'DEFAULT_(\w+)\s*=\s*([0-9.]+)', content)
+                    for const_name, const_value in default_matches:
+                        parameters[f'default_{const_name.lower()}'] = float(const_value)
+                    
+                    if parameters:
+                        metadata['matcher_parameters'] = parameters
+                        metadata['matcher_source_file'] = matcher_file
+                        print(f"   ✅ Extracted parameters from {matcher_file}")
+                        break
+                        
+                except Exception as e:
+                    print(f"   ⚠️ Could not read {matcher_file}: {e}")
+                    continue
+        
+        # Try to infer parameters from the matches file itself
+        try:
+            matches_df = pd.read_csv(file_paths.get('matches', ''))
+            if not matches_df.empty:
+                score_cols = [col for col in matches_df.columns if 'score' in col.lower()]
+                
+                # Analyze score distributions to infer parameters
+                score_analysis = {}
+                for col in score_cols:
+                    if col in matches_df.columns:
+                        scores = matches_df[col].dropna()
+                        if len(scores) > 0:
+                            score_analysis[col] = {
+                                'min': float(scores.min()),
+                                'max': float(scores.max()),
+                                'mean': float(scores.mean()),
+                                'std': float(scores.std()),
+                                'count': int(len(scores))
+                            }
+                
+                metadata['matcher_info'] = metadata.get('matcher_info', {})
+                metadata['matcher_info'].update({
+                    'score_columns': score_cols,
+                    'has_domain_score': 'Domain_Score' in matches_df.columns,
+                    'has_semantic_score': 'Semantic_Score' in matches_df.columns,
+                    'has_bm25_score': 'BM25_Score' in matches_df.columns,
+                    'has_query_expansion_score': 'Query_Expansion_Score' in matches_df.columns,
+                    'total_matches_generated': len(matches_df),
+                    'unique_requirements_matched': len(matches_df['Requirement_ID'].unique()) if 'Requirement_ID' in matches_df.columns else None,
+                    'avg_matches_per_requirement': len(matches_df) / len(matches_df['Requirement_ID'].unique()) if 'Requirement_ID' in matches_df.columns else None,
+                    'score_analysis': score_analysis
+                })
+                
+                # Try to infer top_n parameter from matches per requirement
+                if 'Requirement_ID' in matches_df.columns:
+                    matches_per_req = matches_df['Requirement_ID'].value_counts()
+                    most_common_count = matches_per_req.mode()[0] if len(matches_per_req) > 0 else None
+                    if most_common_count:
+                        metadata['inferred_parameters'] = metadata.get('inferred_parameters', {})
+                        metadata['inferred_parameters']['likely_top_n'] = int(most_common_count)
+                
+        except Exception as e:
+            print(f"   ⚠️ Could not analyze matches file: {e}")
+        
+        return metadata
+
     def _analyze_results_enhanced(self, matches_df: pd.DataFrame, ground_truth: Dict, 
                                  requirements_df: pd.DataFrame, score_col: str, req_col: str, act_col: str) -> Dict:
         """Enhanced results analysis."""
@@ -518,69 +735,206 @@ class FixedSimpleEvaluator:
         
         return analysis
     
-    def _generate_report_enhanced(self, metrics: Dict, analysis: Dict) -> str:
-        """Generate enhanced evaluation report."""
+    def _generate_report_enhanced(self, metrics: Dict, analysis: Dict, metadata: Dict = None) -> str:
+        """Generate enhanced evaluation report with supplementary metrics and metadata."""
         
         report = f"""
-ENHANCED MATCHING EVALUATION REPORT
-{'='*50}
+    ENHANCED MATCHING EVALUATION REPORT
+    {'='*50}
 
-📊 METRICS SUMMARY
-{'-'*20}
-Coverage: {metrics.get('coverage', 0):.1%} of requirements have matches
-Perfect Matches: {metrics.get('perfect_matches', 0)}/{metrics.get('total_evaluated', 0)} ({metrics.get('perfect_match_rate', 0):.1%})
+    ⚙️ RUN METADATA
+    {'-'*15}
+    Timestamp: {metadata.get('timestamp', 'Unknown') if metadata else 'Unknown'}
+    Evaluator: {metadata.get('evaluator_version', 'Enhanced Simple Evaluator') if metadata else 'Enhanced Simple Evaluator'}
+    Python: {metadata.get('python_version', 'Unknown') if metadata else 'Unknown'}
+    Platform: {metadata.get('platform', 'Unknown') if metadata else 'Unknown'}
+    """
+        
+        # Add matcher information if available
+        if metadata and 'matcher_info' in metadata:
+            matcher_info = metadata['matcher_info']
+            report += f"""
+    🤖 MATCHER CONFIGURATION
+    {'-'*25}
+    Score Components: {', '.join(matcher_info.get('score_columns', ['Unknown']))}
+    Domain Features: {'✅ Yes' if matcher_info.get('has_domain_score') else '❌ No'}
+    Semantic Features: {'✅ Yes' if matcher_info.get('has_semantic_score') else '❌ No'}
+    BM25 Features: {'✅ Yes' if matcher_info.get('has_bm25_score') else '❌ No'}
+    Query Expansion: {'✅ Yes' if matcher_info.get('has_query_expansion_score') else '❌ No'}
+    Total Matches Generated: {matcher_info.get('total_matches_generated', 'Unknown')}
+    """
+            
+            if matcher_info.get('avg_matches_per_requirement'):
+                report += f"Avg Matches per Requirement: {matcher_info['avg_matches_per_requirement']:.1f}\n"
+        
+        # Add detailed parameters if extracted
+        if metadata and 'matcher_parameters' in metadata:
+            params = metadata['matcher_parameters']
+            report += f"""
+    ⚙️ ALGORITHM PARAMETERS
+    {'-'*23}"""
+            
+            # BM25 parameters
+            if 'bm25_k1' in params or 'bm25_b' in params:
+                report += f"\nBM25 Settings:"
+                if 'bm25_k1' in params:
+                    report += f"\n  k1 (term frequency saturation): {params['bm25_k1']}"
+                if 'bm25_b' in params:
+                    report += f"\n  b (length normalization): {params['bm25_b']}"
+            
+            # Similarity thresholds
+            if 'min_similarity' in params:
+                report += f"\n\nSimilarity Threshold: {params['min_similarity']}"
+            
+            # Score weights
+            if 'score_weights' in params:
+                report += f"\n\nScore Component Weights:"
+                for component, weight in params['score_weights'].items():
+                    report += f"\n  {component}: {weight}"
+            
+            # Default parameters
+            default_params = {k: v for k, v in params.items() if k.startswith('default_')}
+            if default_params:
+                report += f"\n\nDefault Parameters:"
+                for param, value in default_params.items():
+                    clean_name = param.replace('default_', '').replace('_', ' ').title()
+                    report += f"\n  {clean_name}: {value}"
+            
+            report += f"\n\nSource: {metadata.get('matcher_source_file', 'Unknown')}"
+        
+        # Add inferred parameters
+        if metadata and 'inferred_parameters' in metadata:
+            inferred = metadata['inferred_parameters']
+            report += f"""
+    🔍 INFERRED SETTINGS
+    {'-'*20}"""
+            if 'likely_top_n' in inferred:
+                report += f"\nLikely top_n: {inferred['likely_top_n']} (from matches per requirement)"
+        
+        # Add detailed score analysis
+        if metadata and 'matcher_info' in metadata and 'score_analysis' in metadata['matcher_info']:
+            score_analysis = metadata['matcher_info']['score_analysis']
+            report += f"""
+    📊 SCORE COMPONENT ANALYSIS
+    {'-'*27}"""
+            for component, stats in score_analysis.items():
+                component_name = component.replace('_', ' ').title()
+                report += f"""
+    {component_name}:
+    Range: {stats['min']:.3f} - {stats['max']:.3f}
+    Mean: {stats['mean']:.3f} (±{stats['std']:.3f})
+    Count: {stats['count']} matches"""
+        
+        # Add file paths
+        if metadata and 'file_paths' in metadata:
+            file_paths = metadata['file_paths']
+            report += f"""
+    📁 DATA FILES
+    {'-'*12}
+    Matches: {Path(file_paths.get('matches', 'Unknown')).name}
+    Ground Truth: {Path(file_paths.get('ground_truth', 'Unknown')).name}
+    Requirements: {Path(file_paths.get('requirements', 'Unknown')).name}
+    """
+        
+        report += f"""
+    📊 CORE METRICS (Multi-label Evaluation)
+    {'-'*25}
+    Coverage: {metrics.get('coverage', 0):.1%} of requirements have matches
+    Perfect Matches: {metrics.get('perfect_matches', 0)}/{metrics.get('total_evaluated', 0)} ({metrics.get('perfect_match_rate', 0):.1%})
 
-Precision@1: {metrics.get('precision_at_1', 0):.3f}
-Recall@1:    {metrics.get('recall_at_1', 0):.3f}
-F1@1:        {metrics.get('f1_at_1', 0):.3f}
+    Precision@1: {metrics.get('precision_at_1', 0):.3f}
+    Recall@1:    {metrics.get('recall_at_1', 0):.3f}
+    F1@1:        {metrics.get('f1_at_1', 0):.3f}
 
-Precision@5: {metrics.get('precision_at_5', 0):.3f}
-Recall@5:    {metrics.get('recall_at_5', 0):.3f}
-F1@5:        {metrics.get('f1_at_5', 0):.3f}
+    Precision@3: {metrics.get('precision_at_3', 0):.3f}
+    Recall@3:    {metrics.get('recall_at_3', 0):.3f}
+    F1@3:        {metrics.get('f1_at_3', 0):.3f}
 
-📈 DATASET OVERVIEW
-{'-'*20}
-Total matches: {analysis.get('total_matches', 0)}
-Unique requirements: {analysis.get('unique_requirements', 0)}
-Avg matches per req: {analysis.get('avg_matches_per_req', 0):.1f}
-Average top-5 coverage: {metrics.get('avg_top5_coverage', 0):.1%}
-"""
+    Precision@5: {metrics.get('precision_at_5', 0):.3f}
+    Recall@5:    {metrics.get('recall_at_5', 0):.3f}
+    F1@5:        {metrics.get('f1_at_5', 0):.3f}
+
+    🎯 PRACTICAL METRICS (Any-Correct Evaluation)  
+    {'-'*30}
+    Hit@1:       {metrics.get('hit_at_1', 0):.1%} (≥1 correct in top-1)
+    Hit@3:       {metrics.get('hit_at_3', 0):.1%} (≥1 correct in top-3)
+    Hit@5:       {metrics.get('hit_at_5', 0):.1%} (≥1 correct in top-5)
+    Success@1:   {metrics.get('success_at_1', 0):.1%} (top prediction correct)
+    Perfect Match Rate: {metrics.get('perfect_match_rate', 0):.1%} (top-1 precision = 1.0)
+    MRR:         {metrics.get('mrr', 0):.3f} (mean reciprocal rank)
+
+    📈 DATASET OVERVIEW
+    {'-'*20}
+    Total matches: {analysis.get('total_matches', 0)}
+    Unique requirements: {analysis.get('unique_requirements', 0)}
+    Avg matches per req: {analysis.get('avg_matches_per_req', 0):.1f}
+    Average top-5 coverage: {metrics.get('avg_top5_coverage', 0):.1%}
+    """
         
         # Score distribution if available
         if 'score_distribution' in analysis:
             dist = analysis['score_distribution']
             report += f"""
-🎯 SCORE DISTRIBUTION
-{'-'*20}
-Average score: {dist.get('mean', 0):.3f}
-Score range: {dist.get('min', 0):.3f} - {dist.get('max', 0):.3f}
-Excellent (≥0.8): {dist.get('excellent', 0)}
-Good (≥0.6): {dist.get('good', 0)}
-Moderate (≥0.4): {dist.get('moderate', 0)}
-"""
+    🎯 SCORE DISTRIBUTION
+    {'-'*20}
+    Average score: {dist.get('mean', 0):.3f}
+    Score range: {dist.get('min', 0):.3f} - {dist.get('max', 0):.3f}
+    Excellent (≥0.8): {dist.get('excellent', 0)}
+    Good (≥0.6): {dist.get('good', 0)}
+    Moderate (≥0.4): {dist.get('moderate', 0)}
+    """
         
-        # Overall assessment
+        # Overall assessment with both perspectives
         f1_5 = metrics.get('f1_at_5', 0)
+        hit_5 = metrics.get('hit_at_5', 0)
+        success_1 = metrics.get('success_at_1', 0)
         coverage = metrics.get('coverage', 0)
-        perfect_rate = metrics.get('perfect_match_rate', 0)
         
         report += f"""
-🎯 OVERALL ASSESSMENT
-{'-'*20}"""
+    🎯 OVERALL ASSESSMENT
+    {'-'*20}"""
         
+        # Multi-perspective assessment
         if f1_5 >= 0.7 and coverage >= 0.8:
-            report += "\n🚀 EXCELLENT: Strong matching performance"
+            report += "\n🚀 EXCELLENT: Strong multi-label matching performance"
         elif f1_5 >= 0.5 and coverage >= 0.6:
-            report += "\n✅ GOOD: Solid matching with room for improvement"
+            report += "\n✅ GOOD: Solid multi-label matching with room for improvement"
         elif f1_5 >= 0.3:
-            report += "\n📈 MODERATE: Acceptable but needs tuning"
+            report += "\n📈 MODERATE: Acceptable multi-label performance but needs tuning"
         else:
-            report += "\n🔧 NEEDS WORK: Consider algorithm improvements"
+            report += "\n🔧 NEEDS WORK: Multi-label performance requires algorithm improvements"
         
-        report += f"\n\nKey insights:"
-        report += f"\n• F1@5 = {f1_5:.3f}, Coverage = {coverage:.1%}"
-        report += f"\n• Perfect match rate = {perfect_rate:.1%}"
-        report += f"\n• Fixed column mapping and normalization issues"
+        # Practical perspective
+        if hit_5 >= 0.8:
+            report += "\n🎯 PRACTICAL: Excellent - finds useful matches for most requirements"
+        elif hit_5 >= 0.6:
+            report += "\n🎯 PRACTICAL: Good - finds useful matches for majority of requirements"
+        elif hit_5 >= 0.4:
+            report += "\n🎯 PRACTICAL: Moderate - finds useful matches for some requirements"
+        else:
+            report += "\n🎯 PRACTICAL: Poor - struggles to find useful matches"
+        
+        report += f"""
+
+    📊 KEY INSIGHTS
+    {'-'*15}
+    • Multi-label F1@5 = {f1_5:.3f} (finds all ground truth activities)
+    • Practical Hit@5 = {hit_5:.1%} (finds at least one good match)
+    • Success@1 = {success_1:.1%} (perfect top prediction rate)
+    • Coverage = {coverage:.1%} (requirements attempted)
+
+    💡 INTERPRETATION
+    {'-'*15}
+    The gap between F1@5 ({f1_5:.3f}) and Hit@5 ({hit_5:.1%}) shows how much
+    the system is penalized for not finding ALL ground truth activities.
+    """
+        
+        if hit_5 > f1_5 * 2:
+            report += "Large gap suggests many requirements have multiple valid activities."
+        elif hit_5 > f1_5 * 1.5:
+            report += "Moderate gap suggests some requirements have multiple valid activities."
+        else:
+            report += "Small gap suggests most requirements have single ground truth activities."
         
         return report
     
@@ -607,12 +961,11 @@ Moderate (≥0.4): {dist.get('moderate', 0)}
         print(f"   📊 Metrics: {metrics_file}")
         print(f"   📝 Report: {report_file}")
 
-
 def main():
     """Run the fixed evaluation."""
-    print("🚀 RUNNING FIXED SIMPLE EVALUATION")
+    print("🚀 RUNNING ENHANCED SIMPLE EVALUATION")
     print("=" * 50)
-    print("Goal: Fix column mapping, normalization, and debug issues")
+    print("Goal: Multi-label + practical metrics for complete picture")
     
     evaluator = FixedSimpleEvaluator()
     
@@ -624,10 +977,32 @@ def main():
         )
         
         if "error" not in results:
-            print(f"\n✅ Fixed evaluation complete!")
-            print(f"📊 F1@5: {results['metrics']['f1_at_5']:.3f}")
-            print(f"📈 Coverage: {results['metrics']['coverage']:.1%}")
-            print(f"🎯 Perfect matches: {results['metrics']['perfect_matches']}/{results['metrics']['total_evaluated']}")
+            print(f"\n✅ Enhanced evaluation complete!")
+            
+            # Core metrics
+            print(f"\n📊 CORE METRICS (Multi-label):")
+            print(f"   F1@1: {results['metrics']['f1_at_1']:.3f}")
+            print(f"   F1@3: {results['metrics']['f1_at_3']:.3f}")
+            print(f"   F1@5: {results['metrics']['f1_at_5']:.3f}")
+            print(f"   Coverage: {results['metrics']['coverage']:.1%}")
+            
+            # Practical metrics
+            print(f"\n🎯 PRACTICAL METRICS (Any-correct):")
+            print(f"   Hit@1: {results['metrics']['hit_at_1']:.1%}")
+            print(f"   Hit@3: {results['metrics']['hit_at_3']:.1%}")
+            print(f"   Hit@5: {results['metrics']['hit_at_5']:.1%}")
+            print(f"   Success@1: {results['metrics']['success_at_1']:.1%}")
+            print(f"   MRR: {results['metrics']['mrr']:.3f}")
+            
+            # Quick insight
+            f1_5 = results['metrics']['f1_at_5']
+            hit_5 = results['metrics']['hit_at_5']
+            print(f"\n💡 Gap Analysis:")
+            print(f"   F1@5 vs Hit@5: {f1_5:.3f} vs {hit_5:.1%}")
+            if hit_5 > f1_5 * 1.5:
+                print(f"   → System finds good matches but many requirements have multiple ground truth activities")
+            else:
+                print(f"   → System performance is consistent across both evaluation approaches")
             
             # Show the debugging info that was used
             debug_info = results.get('debugging_info', {})
@@ -635,8 +1010,7 @@ def main():
             print(f"   Score column: {debug_info.get('score_column')}")
             print(f"   Req column: {debug_info.get('req_column')}")
             print(f"   Activity column: {debug_info.get('activity_column')}")
-            if 'file_paths' in debug_info:
-                print(f"   File paths used: {debug_info['file_paths']}")
+            
         else:
             print(f"\n❌ Evaluation failed: {results['error']}")
             
