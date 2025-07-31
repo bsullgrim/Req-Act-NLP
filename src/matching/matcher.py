@@ -738,16 +738,19 @@ class AerospaceMatcher:
                     min_similarity: float = 0.15,
                     top_n: int = 5,
                     output_file: str = "aerospace_matches",
-                    save_explanations: bool = True) -> pd.DataFrame:
+                    save_explanations: bool = True) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         """
-        OPTIMIZED: Run aerospace-optimized matching with batched embeddings.
+        Run aerospace-optimized matching with batched embeddings.
+        
+        Returns:
+            Tuple of (matches_dataframe, run_parameters)
         """
         
         # Default aerospace-optimized weights
         if weights is None:
             weights = {
                 'semantic': 1,        # Moderate - general models struggle with aerospace
-                'bm25': 1,           # High - term matching crucial in technical domains
+                'bm25': 3,           # High - term matching crucial in technical domains
                 'domain': 1,         # High - aerospace terms are key
                 'query_expansion': 1  # Moderate - helps with sparse activities 
             }
@@ -926,7 +929,17 @@ class AerospaceMatcher:
             logger.warning("⚠️ No matches found with current parameters")
             matches_df = pd.DataFrame()
         
-        return matches_df
+        run_parameters = {
+            'weights': weights,
+            'min_similarity': min_similarity,
+            'top_n': top_n,
+            'output_file': output_file,
+            'requirements_file': requirements_file,
+            'activities_file': activities_file,
+            'save_explanations': save_explanations
+        }
+        
+        return matches_df, run_parameters
     
     def _print_matching_analysis(self, matches_df: pd.DataFrame, weights: Dict[str, float]):
         """Print clean matching analysis."""
@@ -999,7 +1012,7 @@ class AerospaceMatcher:
         print(f"  High-quality matches: {excellent_pct:.1f}%")
 
 def main():
-    """Main execution function with simple evaluation."""
+    """Run aerospace matching with enhanced evaluation parameter passing."""
     print("="*70)
     print("🚀 AEROSPACE REQUIREMENTS MATCHER")
     print("="*70)
@@ -1022,9 +1035,10 @@ def main():
     
     # Create matcher
     matcher = AerospaceMatcher(repo_manager=repo_manager)
+    
     try:
-        # Run matching (existing code)
-        results_df = matcher.run_matching(
+        # Run matching and GET the parameters it returns
+        results_df, run_parameters = matcher.run_matching(
             requirements_file="requirements.csv",
             activities_file="activities.csv",
             min_similarity=0.15,
@@ -1038,33 +1052,60 @@ def main():
         print(f"📄 Explanations: outputs/matching_results/aerospace_matches_explanations.json")
         print(f"📊 Total matches: {len(results_df)}")
         
-        # === SIMPLE EVALUATION INTEGRATION ===
-        print(f"\n📊 Running simple evaluation...")
+        # === ENHANCED EVALUATION WITH ACTUAL RUN PARAMETERS ===
+        print(f"\n📊 Running enhanced evaluation with actual run configuration...")
         eval_results = None
         try:
             from src.evaluation.simple_evaluation import FixedSimpleEvaluator
+            
+            # Add matcher-specific information to the run_parameters
+            run_parameters.update({
+                'spacy_model': getattr(matcher.nlp, 'meta', {}).get('name', 'unknown') if hasattr(matcher, 'nlp') else 'unknown',
+                'matcher_class': matcher.__class__.__name__,
+                'aerospace_terms_count': len(matcher.all_aerospace_terms) if hasattr(matcher, 'all_aerospace_terms') else 0,
+                'synonyms_count': len(matcher.synonyms) if hasattr(matcher, 'synonyms') else 0,
+            })
             
             evaluator = FixedSimpleEvaluator()
             eval_results = evaluator.evaluate_matches(
                 matches_file="outputs/matching_results/aerospace_matches.csv",
                 ground_truth_file="manual_matches.csv",
-                requirements_file="requirements.csv"
+                requirements_file="requirements.csv",
+                run_params=run_parameters  # Use the ACTUAL parameters from run_matching!
             )
             
             if "error" not in eval_results:
-                print(f"✅ Simple evaluation complete!")
+                print(f"✅ Enhanced evaluation complete!")
                 print(f"📊 F1@5: {eval_results['metrics']['f1_at_5']:.3f}")
                 print(f"📈 Coverage: {eval_results['metrics']['coverage']:.1%}")
                 print(f"🎯 Perfect matches: {eval_results['metrics']['perfect_matches']}/{eval_results['metrics']['total_evaluated']}")
+                print(f"🎯 Hit@5: {eval_results['metrics']['hit_at_5']:.1%}")
+                
+                # Show the configuration that was captured
+                metadata = eval_results.get('metadata', {})
+                if 'algorithm_parameters' in metadata:
+                    params = metadata['algorithm_parameters']
+                    print(f"\n🔧 CONFIGURATION CONFIRMED:")
+                    print(f"   Threshold: {params.get('min_similarity_threshold', 'Unknown')}")
+                    print(f"   Top-N: {params.get('top_n_matches', 'Unknown')}")
+                    print(f"   Model: {run_parameters.get('spacy_model', 'Unknown')}")
+                    
+                if 'score_weights' in metadata:
+                    weights = metadata['score_weights']
+                    weights_str = ', '.join([f"{k}:{v}" for k, v in weights.items()])
+                    print(f"   Weights: {weights_str}")
+                
             else:
                 print(f"⚠️ Evaluation failed: {eval_results['error']}")
                 eval_results = None
         
         except ImportError as e:
-            print(f"⚠️ Simple evaluator not available: {e}")
+            print(f"⚠️ Enhanced evaluator not available: {e}")
         except Exception as e:
             print(f"⚠️ Evaluation error: {e}")
-        
+            import traceback
+            traceback.print_exc()
+
         # === USE EXISTING MatchingWorkbookGenerator ===
         print(f"\n📊 Creating matching workbook...")
         try:

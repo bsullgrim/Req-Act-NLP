@@ -16,7 +16,7 @@ import numpy as np
 import sys
 from pathlib import Path
 import json
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional, Any
 from collections import defaultdict
 import re
 
@@ -76,15 +76,19 @@ class FixedSimpleEvaluator:
     def evaluate_matches(self, 
                         matches_file: str = "outputs/matching_results/aerospace_matches.csv",
                         ground_truth_file: str = "manual_matches.csv",
-                        requirements_file: str = "requirements.csv") -> Dict:
+                        requirements_file: str = "requirements.csv",
+                        run_params: Optional[Dict[str, Any]] = None) -> Dict:
         """Run enhanced evaluation with debugging."""
         
-        print("🔍 FIXED SIMPLE MATCHING EVALUATION")
+        print("🔍 ENHANCED SIMPLE MATCHING EVALUATION")
         print("=" * 50)
         print("🐛 Debug mode: ON - Will show detailed diagnostics")
         
         # Get proper file paths
         file_paths = self.get_file_paths(matches_file, ground_truth_file, requirements_file)
+        
+        # Collect run metadata (now includes run_params)
+        metadata = self._collect_run_metadata(file_paths, run_params)
         
         # 1. Load data with enhanced error handling
         print("\n📂 Loading data...")
@@ -114,12 +118,13 @@ class FixedSimpleEvaluator:
         
         # 6. Generate report
         print("\n📝 Generating report...")
-        report = self._generate_report_enhanced(metrics, analysis)
+        report = self._generate_report_enhanced(metrics, analysis, metadata)
         
         self.results = {
             'metrics': metrics,
             'analysis': analysis,
             'report': report,
+            'metadata': metadata,
             'debugging_info': {
                 'score_column': score_col,
                 'req_column': req_col,
@@ -558,11 +563,12 @@ class FixedSimpleEvaluator:
         
         return supplementary    
 
-    def _collect_run_metadata(self, file_paths: dict) -> dict:
+    def _collect_run_metadata(self, file_paths: dict, run_params: Optional[Dict[str, Any]] = None) -> dict:
         """Collect comprehensive metadata about the current run including all tuning parameters."""
         from datetime import datetime
         import platform
         import sys
+        import re
         
         metadata = {
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -572,7 +578,33 @@ class FixedSimpleEvaluator:
             'file_paths': file_paths
         }
         
-        # Try to extract detailed matcher parameters from explanations file
+        # PRIORITY 1: Use run parameters passed directly from matcher (most reliable)
+        if run_params:
+            print(f"   ✅ Using provided run parameters from matcher")
+            
+            # Core algorithm parameters
+            metadata['algorithm_parameters'] = {
+                'min_similarity_threshold': run_params.get('min_similarity', 'Unknown'),
+                'top_n_matches': run_params.get('top_n', 'Unknown'),
+                'output_file': run_params.get('output_file', 'Unknown'),
+                'requirements_file': run_params.get('requirements_file', 'Unknown'),
+                'activities_file': run_params.get('activities_file', 'Unknown'),
+                'save_explanations': run_params.get('save_explanations', 'Unknown')
+            }
+            
+            # Score component weights
+            if 'weights' in run_params and run_params['weights']:
+                metadata['score_weights'] = run_params['weights'].copy()
+            
+            # Additional matcher info if provided
+            if 'spacy_model' in run_params:
+                metadata['spacy_model'] = run_params['spacy_model']
+            if 'domain_terms_count' in run_params:
+                metadata['domain_terms_count'] = run_params['domain_terms_count']
+            if 'synonyms_count' in run_params:
+                metadata['synonyms_count'] = run_params['synonyms_count']
+        
+        # PRIORITY 2: Extract detailed matcher parameters from explanations file
         explanations_file = file_paths.get('matches', '').replace('.csv', '_explanations.json')
         if Path(explanations_file).exists():
             try:
@@ -595,24 +627,48 @@ class FixedSimpleEvaluator:
                         # Extract BM25 parameters from explanation text
                         if 'bm25' in explanations:
                             bm25_text = explanations['bm25']
-                            # Look for parameter patterns in explanation
                             metadata['matcher_info']['bm25_details'] = bm25_text
+                            
+                            # Try to extract k1 and b parameters from explanation
+                            k1_match = re.search(r'k1[=:\s]*([0-9.]+)', bm25_text)
+                            if k1_match:
+                                if 'algorithm_parameters' not in metadata:
+                                    metadata['algorithm_parameters'] = {}
+                                metadata['algorithm_parameters']['bm25_k1'] = float(k1_match.group(1))
+                            
+                            b_match = re.search(r'\bb[=:\s]*([0-9.]+)', bm25_text)
+                            if b_match:
+                                if 'algorithm_parameters' not in metadata:
+                                    metadata['algorithm_parameters'] = {}
+                                metadata['algorithm_parameters']['bm25_b'] = float(b_match.group(1))
                             
                         # Extract semantic model info
                         if 'semantic' in explanations:
                             semantic_text = explanations['semantic']
                             metadata['matcher_info']['semantic_details'] = semantic_text
                             
+                            # Try to extract model type
+                            if 'spacy' in semantic_text.lower():
+                                metadata['semantic_method'] = 'spaCy'
+                            elif 'transformer' in semantic_text.lower():
+                                metadata['semantic_method'] = 'Transformer'
+                            elif 'sentence' in semantic_text.lower():
+                                metadata['semantic_method'] = 'SentenceTransformer'
+                            
                         # Extract domain scoring details
                         if 'domain' in explanations:
                             domain_text = explanations['domain']
                             metadata['matcher_info']['domain_details'] = domain_text
                             
+                            # Count domain terms mentioned
+                            domain_terms_mentioned = len(re.findall(r'aerospace|domain|weight', domain_text.lower()))
+                            metadata['domain_terms_in_explanation'] = domain_terms_mentioned
+                            
             except Exception as e:
                 print(f"   ⚠️ Could not parse explanations file: {e}")
         
-        # Try to extract parameters from the matcher source files (if accessible)
-        matcher_files = ['matcher.py', 'src/matching/matcher.py', '../matcher.py']
+        # PRIORITY 3: Try to extract parameters from the matcher source files
+        matcher_files = ['matcher.py', 'src/matching/matcher.py', '../matcher.py', './matcher.py']
         for matcher_file in matcher_files:
             if Path(matcher_file).exists():
                 try:
@@ -620,42 +676,42 @@ class FixedSimpleEvaluator:
                         content = f.read()
                         
                     # Extract key parameters using regex
-                    parameters = {}
+                    extracted_params = {}
                     
-                    # BM25 parameters
-                    import re
+                    # Look for BM25 k1 parameter
+                    k1_matches = re.findall(r'k1\s*[=:]\s*([0-9.]+)', content)
+                    if k1_matches:
+                        extracted_params['bm25_k1_from_source'] = float(k1_matches[-1])
                     
-                    # Look for k1 parameter
-                    k1_match = re.search(r'k1\s*[=:]\s*([0-9.]+)', content)
-                    if k1_match:
-                        parameters['bm25_k1'] = float(k1_match.group(1))
-                    
-                    # Look for b parameter  
-                    b_match = re.search(r'\bb\s*[=:]\s*([0-9.]+)', content)
-                    if b_match:
-                        parameters['bm25_b'] = float(b_match.group(1))
+                    # Look for BM25 b parameter  
+                    b_matches = re.findall(r'\bb\s*[=:]\s*([0-9.]+)', content)
+                    if b_matches:
+                        extracted_params['bm25_b_from_source'] = float(b_matches[-1])
                     
                     # Look for similarity thresholds
                     min_sim_matches = re.findall(r'min_similarity[^=]*[=:]\s*([0-9.]+)', content)
                     if min_sim_matches:
-                        parameters['min_similarity'] = float(min_sim_matches[-1])  # Get last occurrence
+                        extracted_params['min_similarity_from_source'] = float(min_sim_matches[-1])
                     
-                    # Look for weights
-                    weights_section = re.search(r'weights\s*[=:]\s*\{([^}]+)\}', content, re.MULTILINE | re.DOTALL)
-                    if weights_section:
-                        weights_text = weights_section.group(1)
-                        # Parse individual weight components
+                    # Look for default weights
+                    weights_sections = re.findall(r'weights\s*[=:]\s*\{([^}]+)\}', content, re.MULTILINE | re.DOTALL)
+                    for weights_text in weights_sections:
                         weight_matches = re.findall(r"['\"]?(\w+)['\"]?\s*:\s*([0-9.]+)", weights_text)
                         if weight_matches:
-                            parameters['score_weights'] = {name: float(value) for name, value in weight_matches}
+                            extracted_params['default_weights_from_source'] = {name: float(value) for name, value in weight_matches}
                     
                     # Look for default constants
                     default_matches = re.findall(r'DEFAULT_(\w+)\s*=\s*([0-9.]+)', content)
                     for const_name, const_value in default_matches:
-                        parameters[f'default_{const_name.lower()}'] = float(const_value)
+                        extracted_params[f'default_{const_name.lower()}'] = float(const_value)
                     
-                    if parameters:
-                        metadata['matcher_parameters'] = parameters
+                    # Look for class names
+                    class_matches = re.findall(r'class\s+(\w*Matcher\w*)', content)
+                    if class_matches:
+                        extracted_params['matcher_class_from_source'] = class_matches[0]
+                    
+                    if extracted_params:
+                        metadata['source_code_analysis'] = extracted_params
                         metadata['matcher_source_file'] = matcher_file
                         print(f"   ✅ Extracted parameters from {matcher_file}")
                         break
@@ -664,13 +720,33 @@ class FixedSimpleEvaluator:
                     print(f"   ⚠️ Could not read {matcher_file}: {e}")
                     continue
         
-        # Try to infer parameters from the matches file itself
+        # PRIORITY 4: Analyze the matches file for additional insights
         try:
             matches_df = pd.read_csv(file_paths.get('matches', ''))
             if not matches_df.empty:
                 score_cols = [col for col in matches_df.columns if 'score' in col.lower()]
                 
-                # Analyze score distributions to infer parameters
+                # Basic match analysis
+                metadata['match_analysis'] = {
+                    'total_matches_generated': len(matches_df),
+                    'score_columns': score_cols,
+                    'has_domain_score': 'Domain_Score' in matches_df.columns,
+                    'has_semantic_score': 'Semantic_Score' in matches_df.columns,
+                    'has_bm25_score': 'BM25_Score' in matches_df.columns,
+                    'has_query_expansion_score': 'Query_Expansion_Score' in matches_df.columns,
+                }
+                
+                # Requirement analysis
+                if 'Requirement_ID' in matches_df.columns:
+                    unique_reqs = len(matches_df['Requirement_ID'].unique())
+                    avg_matches = len(matches_df) / unique_reqs
+                    metadata['match_analysis'].update({
+                        'unique_requirements_matched': unique_reqs,
+                        'avg_matches_per_requirement': avg_matches,
+                        'inferred_top_n': int(matches_df['Requirement_ID'].value_counts().mode()[0]) if len(matches_df) > 0 else None
+                    })
+                
+                # Score distribution analysis
                 score_analysis = {}
                 for col in score_cols:
                     if col in matches_df.columns:
@@ -681,35 +757,82 @@ class FixedSimpleEvaluator:
                                 'max': float(scores.max()),
                                 'mean': float(scores.mean()),
                                 'std': float(scores.std()),
-                                'count': int(len(scores))
+                                'median': float(scores.median()),
+                                'count': int(len(scores)),
+                                'non_zero_count': int(len(scores[scores > 0]))
                             }
+                            
+                            # Score distribution bins
+                            if col == 'Combined_Score':
+                                score_analysis[col]['distribution'] = {
+                                    'excellent_count': int(len(scores[scores >= 0.8])),
+                                    'good_count': int(len(scores[(scores >= 0.6) & (scores < 0.8)])),
+                                    'moderate_count': int(len(scores[(scores >= 0.4) & (scores < 0.6)])),
+                                    'poor_count': int(len(scores[scores < 0.4]))
+                                }
                 
-                metadata['matcher_info'] = metadata.get('matcher_info', {})
-                metadata['matcher_info'].update({
-                    'score_columns': score_cols,
-                    'has_domain_score': 'Domain_Score' in matches_df.columns,
-                    'has_semantic_score': 'Semantic_Score' in matches_df.columns,
-                    'has_bm25_score': 'BM25_Score' in matches_df.columns,
-                    'has_query_expansion_score': 'Query_Expansion_Score' in matches_df.columns,
-                    'total_matches_generated': len(matches_df),
-                    'unique_requirements_matched': len(matches_df['Requirement_ID'].unique()) if 'Requirement_ID' in matches_df.columns else None,
-                    'avg_matches_per_requirement': len(matches_df) / len(matches_df['Requirement_ID'].unique()) if 'Requirement_ID' in matches_df.columns else None,
-                    'score_analysis': score_analysis
-                })
-                
-                # Try to infer top_n parameter from matches per requirement
-                if 'Requirement_ID' in matches_df.columns:
-                    matches_per_req = matches_df['Requirement_ID'].value_counts()
-                    most_common_count = matches_per_req.mode()[0] if len(matches_per_req) > 0 else None
-                    if most_common_count:
-                        metadata['inferred_parameters'] = metadata.get('inferred_parameters', {})
-                        metadata['inferred_parameters']['likely_top_n'] = int(most_common_count)
+                if score_analysis:
+                    metadata['score_analysis'] = score_analysis
+                    
+            else:
+                print(f"   ⚠️ Matches file is empty")
                 
         except Exception as e:
             print(f"   ⚠️ Could not analyze matches file: {e}")
         
+        # PRIORITY 5: Try to infer additional system information
+        try:
+            # Check if spaCy models are available
+            try:
+                import spacy
+                available_models = []
+                for model_name in ['en_core_web_sm', 'en_core_web_md', 'en_core_web_lg', 'en_core_web_trf']:
+                    try:
+                        spacy.load(model_name)
+                        available_models.append(model_name)
+                    except:
+                        pass
+                metadata['available_spacy_models'] = available_models
+            except ImportError:
+                metadata['available_spacy_models'] = []
+            
+            # Check for optional dependencies
+            optional_deps = {}
+            try:
+                import sklearn
+                optional_deps['sklearn'] = sklearn.__version__
+            except ImportError:
+                optional_deps['sklearn'] = 'Not installed'
+            
+            try:
+                import sentence_transformers
+                optional_deps['sentence_transformers'] = sentence_transformers.__version__
+            except ImportError:
+                optional_deps['sentence_transformers'] = 'Not installed'
+                
+            metadata['dependencies'] = optional_deps
+            
+        except Exception as e:
+            print(f"   ⚠️ Could not collect system information: {e}")
+        
+        # Summary of what was collected
+        collection_summary = []
+        if run_params:
+            collection_summary.append("Direct run parameters")
+        if 'matcher_info' in metadata:
+            collection_summary.append("Explanation file analysis")
+        if 'source_code_analysis' in metadata:
+            collection_summary.append("Source code analysis") 
+        if 'match_analysis' in metadata:
+            collection_summary.append("Match file analysis")
+        if 'dependencies' in metadata:
+            collection_summary.append("System information")
+        
+        metadata['collection_summary'] = collection_summary
+        print(f"   📊 Collected metadata from: {', '.join(collection_summary)}")
+        
         return metadata
-
+    
     def _analyze_results_enhanced(self, matches_df: pd.DataFrame, ground_truth: Dict, 
                                  requirements_df: pd.DataFrame, score_col: str, req_col: str, act_col: str) -> Dict:
         """Enhanced results analysis."""
@@ -736,7 +859,7 @@ class FixedSimpleEvaluator:
         return analysis
     
     def _generate_report_enhanced(self, metrics: Dict, analysis: Dict, metadata: Dict = None) -> str:
-        """Generate enhanced evaluation report with supplementary metrics and metadata."""
+        """Generate comprehensive evaluation report with all collected metadata."""
         
         report = f"""
     ENHANCED MATCHING EVALUATION REPORT
@@ -748,95 +871,191 @@ class FixedSimpleEvaluator:
     Evaluator: {metadata.get('evaluator_version', 'Enhanced Simple Evaluator') if metadata else 'Enhanced Simple Evaluator'}
     Python: {metadata.get('python_version', 'Unknown') if metadata else 'Unknown'}
     Platform: {metadata.get('platform', 'Unknown') if metadata else 'Unknown'}
+    Data Collection: {', '.join(metadata.get('collection_summary', ['Unknown'])) if metadata else 'Unknown'}
     """
         
-        # Add matcher information if available
+        # SECTION 1: Algorithm Parameters (Direct from Run)
+        if metadata and 'algorithm_parameters' in metadata:
+            params = metadata['algorithm_parameters']
+            report += f"""
+    🔧 ALGORITHM PARAMETERS
+    {'-'*23}
+    Similarity Threshold: {params.get('min_similarity_threshold', 'Unknown')}
+    Top N Matches: {params.get('top_n_matches', 'Unknown')}
+    Output File: {params.get('output_file', 'Unknown')}
+    Requirements File: {params.get('requirements_file', 'Unknown')}
+    Activities File: {params.get('activities_file', 'Unknown')}
+    Save Explanations: {params.get('save_explanations', 'Unknown')}"""
+            
+            # BM25 parameters if available
+            if 'bm25_k1' in params or 'bm25_b' in params:
+                report += f"""
+
+    BM25 Parameters:
+    k1 (term frequency saturation): {params.get('bm25_k1', 'Unknown')}
+    b (length normalization): {params.get('bm25_b', 'Unknown')}"""
+        
+        # SECTION 2: Score Component Weights
+        if metadata and 'score_weights' in metadata:
+            weights = metadata['score_weights']
+            report += f"""
+            
+    ⚖️ SCORE COMPONENT WEIGHTS
+    {'-'*26}"""
+            total_weight = sum(weights.values()) if weights else 1
+            for component, weight in weights.items():
+                component_name = component.replace('_', ' ').title()
+                percentage = (weight / total_weight) * 100 if total_weight > 0 else 0
+                report += f"""
+    {component_name}: {weight} ({percentage:.1f}%)"""
+            
+            report += f"""
+    Total Weight: {total_weight}"""
+        
+        # SECTION 3: Matcher Configuration Details
         if metadata and 'matcher_info' in metadata:
             matcher_info = metadata['matcher_info']
             report += f"""
+
     🤖 MATCHER CONFIGURATION
     {'-'*25}
-    Score Components: {', '.join(matcher_info.get('score_columns', ['Unknown']))}
-    Domain Features: {'✅ Yes' if matcher_info.get('has_domain_score') else '❌ No'}
-    Semantic Features: {'✅ Yes' if matcher_info.get('has_semantic_score') else '❌ No'}
-    BM25 Features: {'✅ Yes' if matcher_info.get('has_bm25_score') else '❌ No'}
-    Query Expansion: {'✅ Yes' if matcher_info.get('has_query_expansion_score') else '❌ No'}
-    Total Matches Generated: {matcher_info.get('total_matches_generated', 'Unknown')}
-    """
+    Has Explanations: {'✅ Yes' if matcher_info.get('has_explanations') else '❌ No'}
+    Score Components: {', '.join(matcher_info.get('score_components', ['Unknown']))}
+    Explanation Types: {', '.join(matcher_info.get('explanation_keys', ['Unknown']))}"""
             
-            if matcher_info.get('avg_matches_per_requirement'):
-                report += f"Avg Matches per Requirement: {matcher_info['avg_matches_per_requirement']:.1f}\n"
+            # Semantic method detection
+            if metadata.get('semantic_method'):
+                report += f"""
+    Semantic Method: {metadata['semantic_method']}"""
+            
+            # spaCy model info
+            if metadata.get('spacy_model'):
+                report += f"""
+    spaCy Model: {metadata['spacy_model']}"""
         
-        # Add detailed parameters if extracted
-        if metadata and 'matcher_parameters' in metadata:
-            params = metadata['matcher_parameters']
+        # SECTION 4: Match Generation Analysis
+        if metadata and 'match_analysis' in metadata:
+            match_info = metadata['match_analysis']
             report += f"""
-    ⚙️ ALGORITHM PARAMETERS
-    {'-'*23}"""
+
+    📊 MATCH GENERATION ANALYSIS
+    {'-'*29}
+    Total Matches Generated: {match_info.get('total_matches_generated', 'Unknown')}
+    Unique Requirements Matched: {match_info.get('unique_requirements_matched', 'Unknown')}"""
+    # Avg Matches per Requirement: {match_info.get('avg_matches_per_requirement', 'Unknown'):.1f if isinstance(match_info.get('avg_matches_per_requirement'), (int, float)) else 'Unknown'}"""
             
-            # BM25 parameters
-            if 'bm25_k1' in params or 'bm25_b' in params:
-                report += f"\nBM25 Settings:"
-                if 'bm25_k1' in params:
-                    report += f"\n  k1 (term frequency saturation): {params['bm25_k1']}"
-                if 'bm25_b' in params:
-                    report += f"\n  b (length normalization): {params['bm25_b']}"
+            if match_info.get('inferred_top_n'):
+                report += f"""
+    Inferred Top-N Setting: {match_info['inferred_top_n']}"""
             
-            # Similarity thresholds
-            if 'min_similarity' in params:
-                report += f"\n\nSimilarity Threshold: {params['min_similarity']}"
+            # Feature availability
+            features = []
+            if match_info.get('has_domain_score'):
+                features.append('Domain Scoring')
+            if match_info.get('has_semantic_score'):
+                features.append('Semantic Similarity')
+            if match_info.get('has_bm25_score'):
+                features.append('BM25 Scoring')
+            if match_info.get('has_query_expansion_score'):
+                features.append('Query Expansion')
             
-            # Score weights
-            if 'score_weights' in params:
-                report += f"\n\nScore Component Weights:"
-                for component, weight in params['score_weights'].items():
-                    report += f"\n  {component}: {weight}"
-            
-            # Default parameters
-            default_params = {k: v for k, v in params.items() if k.startswith('default_')}
-            if default_params:
-                report += f"\n\nDefault Parameters:"
-                for param, value in default_params.items():
-                    clean_name = param.replace('default_', '').replace('_', ' ').title()
-                    report += f"\n  {clean_name}: {value}"
-            
-            report += f"\n\nSource: {metadata.get('matcher_source_file', 'Unknown')}"
+            if features:
+                report += f"""
+    Active Features: {', '.join(features)}"""
         
-        # Add inferred parameters
-        if metadata and 'inferred_parameters' in metadata:
-            inferred = metadata['inferred_parameters']
+        # SECTION 5: Detailed Score Analysis
+        if metadata and 'score_analysis' in metadata:
+            score_analysis = metadata['score_analysis']
             report += f"""
-    🔍 INFERRED SETTINGS
-    {'-'*20}"""
-            if 'likely_top_n' in inferred:
-                report += f"\nLikely top_n: {inferred['likely_top_n']} (from matches per requirement)"
-        
-        # Add detailed score analysis
-        if metadata and 'matcher_info' in metadata and 'score_analysis' in metadata['matcher_info']:
-            score_analysis = metadata['matcher_info']['score_analysis']
-            report += f"""
-    📊 SCORE COMPONENT ANALYSIS
-    {'-'*27}"""
+
+    📈 SCORE COMPONENT ANALYSIS
+    {'-'*28}"""
+            
             for component, stats in score_analysis.items():
                 component_name = component.replace('_', ' ').title()
                 report += f"""
+
     {component_name}:
     Range: {stats['min']:.3f} - {stats['max']:.3f}
     Mean: {stats['mean']:.3f} (±{stats['std']:.3f})
-    Count: {stats['count']} matches"""
+    Median: {stats['median']:.3f}
+    Non-zero: {stats['non_zero_count']}/{stats['count']} ({stats['non_zero_count']/stats['count']*100:.1f}%)"""
+                
+                # Special distribution analysis for Combined Score
+                if component == 'Combined_Score' and 'distribution' in stats:
+                    dist = stats['distribution']
+                    total = sum(dist.values())
+                    report += f"""
+    Quality Distribution:
+        Excellent (≥0.8): {dist['excellent_count']} ({dist['excellent_count']/total*100:.1f}%)
+        Good (0.6-0.8): {dist['good_count']} ({dist['good_count']/total*100:.1f}%)
+        Moderate (0.4-0.6): {dist['moderate_count']} ({dist['moderate_count']/total*100:.1f}%)
+        Poor (<0.4): {dist['poor_count']} ({dist['poor_count']/total*100:.1f}%)"""
         
-        # Add file paths
+        # SECTION 6: System Environment
+        if metadata and ('dependencies' in metadata or 'available_spacy_models' in metadata):
+            report += f"""
+
+    🖥️ SYSTEM ENVIRONMENT
+    {'-'*20}"""
+            
+            if 'dependencies' in metadata:
+                deps = metadata['dependencies']
+                report += f"""
+    Dependencies:
+    scikit-learn: {deps.get('sklearn', 'Unknown')}
+    sentence-transformers: {deps.get('sentence_transformers', 'Unknown')}"""
+            
+            if 'available_spacy_models' in metadata:
+                models = metadata['available_spacy_models']
+                if models:
+                    report += f"""
+    Available spaCy Models: {', '.join(models)}"""
+                else:
+                    report += f"""
+    Available spaCy Models: None detected"""
+        
+        # SECTION 7: Source Code Analysis (if available)
+        if metadata and 'source_code_analysis' in metadata:
+            source_analysis = metadata['source_code_analysis']
+            report += f"""
+
+    🔍 SOURCE CODE ANALYSIS
+    {'-'*23}
+    Source File: {metadata.get('matcher_source_file', 'Unknown')}"""
+            
+            if 'matcher_class_from_source' in source_analysis:
+                report += f"""
+    Matcher Class: {source_analysis['matcher_class_from_source']}"""
+            
+            if 'bm25_k1_from_source' in source_analysis or 'bm25_b_from_source' in source_analysis:
+                report += f"""
+    BM25 Parameters in Source:
+    k1: {source_analysis.get('bm25_k1_from_source', 'Not found')}
+    b: {source_analysis.get('bm25_b_from_source', 'Not found')}"""
+            
+            if 'default_weights_from_source' in source_analysis:
+                default_weights = source_analysis['default_weights_from_source']
+                report += f"""
+    Default Weights in Source:"""
+                for comp, weight in default_weights.items():
+                    report += f"""
+    {comp}: {weight}"""
+        
+        # SECTION 8: File Information
         if metadata and 'file_paths' in metadata:
             file_paths = metadata['file_paths']
             report += f"""
+
     📁 DATA FILES
     {'-'*12}
     Matches: {Path(file_paths.get('matches', 'Unknown')).name}
     Ground Truth: {Path(file_paths.get('ground_truth', 'Unknown')).name}
-    Requirements: {Path(file_paths.get('requirements', 'Unknown')).name}
-    """
+    Requirements: {Path(file_paths.get('requirements', 'Unknown')).name}"""
         
+        # SECTION 9: Core Evaluation Metrics
         report += f"""
+
     📊 CORE METRICS (Multi-label Evaluation)
     {'-'*25}
     Coverage: {metrics.get('coverage', 0):.1%} of requirements have matches
@@ -852,7 +1071,10 @@ class FixedSimpleEvaluator:
 
     Precision@5: {metrics.get('precision_at_5', 0):.3f}
     Recall@5:    {metrics.get('recall_at_5', 0):.3f}
-    F1@5:        {metrics.get('f1_at_5', 0):.3f}
+    F1@5:        {metrics.get('f1_at_5', 0):.3f}"""
+        
+        # SECTION 10: Practical Metrics
+        report += f"""
 
     🎯 PRACTICAL METRICS (Any-Correct Evaluation)  
     {'-'*30}
@@ -861,59 +1083,65 @@ class FixedSimpleEvaluator:
     Hit@5:       {metrics.get('hit_at_5', 0):.1%} (≥1 correct in top-5)
     Success@1:   {metrics.get('success_at_1', 0):.1%} (top prediction correct)
     Perfect Match Rate: {metrics.get('perfect_match_rate', 0):.1%} (top-1 precision = 1.0)
-    MRR:         {metrics.get('mrr', 0):.3f} (mean reciprocal rank)
+    MRR:         {metrics.get('mrr', 0):.3f} (mean reciprocal rank)"""
+        
+        # SECTION 11: Dataset Overview
+        report += f"""
 
     📈 DATASET OVERVIEW
     {'-'*20}
     Total matches: {analysis.get('total_matches', 0)}
     Unique requirements: {analysis.get('unique_requirements', 0)}
     Avg matches per req: {analysis.get('avg_matches_per_req', 0):.1f}
-    Average top-5 coverage: {metrics.get('avg_top5_coverage', 0):.1%}
-    """
+    Average top-5 coverage: {metrics.get('avg_top5_coverage', 0):.1%}"""
         
-        # Score distribution if available
+        # SECTION 12: Score Distribution (from analysis)
         if 'score_distribution' in analysis:
             dist = analysis['score_distribution']
             report += f"""
-    🎯 SCORE DISTRIBUTION
-    {'-'*20}
+
+    🎯 EVALUATION SCORE DISTRIBUTION
+    {'-'*32}
     Average score: {dist.get('mean', 0):.3f}
     Score range: {dist.get('min', 0):.3f} - {dist.get('max', 0):.3f}
+    Standard deviation: {dist.get('std', 0):.3f}
     Excellent (≥0.8): {dist.get('excellent', 0)}
     Good (≥0.6): {dist.get('good', 0)}
-    Moderate (≥0.4): {dist.get('moderate', 0)}
-    """
+    Moderate (≥0.4): {dist.get('moderate', 0)}"""
         
-        # Overall assessment with both perspectives
+        # SECTION 13: Performance Assessment
         f1_5 = metrics.get('f1_at_5', 0)
         hit_5 = metrics.get('hit_at_5', 0)
         success_1 = metrics.get('success_at_1', 0)
         coverage = metrics.get('coverage', 0)
+        perfect_rate = metrics.get('perfect_match_rate', 0)
         
         report += f"""
+
     🎯 OVERALL ASSESSMENT
     {'-'*20}"""
         
-        # Multi-perspective assessment
+        # Multi-label assessment
         if f1_5 >= 0.7 and coverage >= 0.8:
-            report += "\n🚀 EXCELLENT: Strong multi-label matching performance"
+            report += "\n🚀 MULTI-LABEL: Excellent - Strong performance finding all ground truth activities"
         elif f1_5 >= 0.5 and coverage >= 0.6:
-            report += "\n✅ GOOD: Solid multi-label matching with room for improvement"
+            report += "\n✅ MULTI-LABEL: Good - Solid performance with room for improvement"
         elif f1_5 >= 0.3:
-            report += "\n📈 MODERATE: Acceptable multi-label performance but needs tuning"
+            report += "\n📈 MULTI-LABEL: Moderate - Acceptable but needs parameter tuning"
         else:
-            report += "\n🔧 NEEDS WORK: Multi-label performance requires algorithm improvements"
+            report += "\n🔧 MULTI-LABEL: Needs work - Consider algorithm improvements"
         
-        # Practical perspective
+        # Practical assessment
         if hit_5 >= 0.8:
-            report += "\n🎯 PRACTICAL: Excellent - finds useful matches for most requirements"
+            report += "\n🎯 PRACTICAL: Excellent - Finds useful matches for most requirements"
         elif hit_5 >= 0.6:
-            report += "\n🎯 PRACTICAL: Good - finds useful matches for majority of requirements"
+            report += "\n🎯 PRACTICAL: Good - Finds useful matches for majority of requirements"
         elif hit_5 >= 0.4:
-            report += "\n🎯 PRACTICAL: Moderate - finds useful matches for some requirements"
+            report += "\n🎯 PRACTICAL: Moderate - Finds useful matches for some requirements"
         else:
-            report += "\n🎯 PRACTICAL: Poor - struggles to find useful matches"
+            report += "\n🎯 PRACTICAL: Poor - Struggles to find useful matches"
         
+        # SECTION 14: Key Insights
         report += f"""
 
     📊 KEY INSIGHTS
@@ -921,22 +1149,97 @@ class FixedSimpleEvaluator:
     • Multi-label F1@5 = {f1_5:.3f} (finds all ground truth activities)
     • Practical Hit@5 = {hit_5:.1%} (finds at least one good match)
     • Success@1 = {success_1:.1%} (perfect top prediction rate)
+    • Perfect Match Rate = {perfect_rate:.1%} (requirements with top-1 precision = 1.0)
     • Coverage = {coverage:.1%} (requirements attempted)
 
     💡 INTERPRETATION
     {'-'*15}
     The gap between F1@5 ({f1_5:.3f}) and Hit@5 ({hit_5:.1%}) shows how much
-    the system is penalized for not finding ALL ground truth activities.
+    the system is penalized for not finding ALL ground truth activities."""
+        
+        if hit_5 > 0 and f1_5 > 0:
+            gap_ratio = hit_5 / f1_5
+            if gap_ratio > 2:
+                report += "\nLarge gap suggests many requirements have multiple valid activities."
+            elif gap_ratio > 1.5:
+                report += "\nModerate gap suggests some requirements have multiple valid activities."
+            else:
+                report += "\nSmall gap suggests most requirements have single ground truth activities."
+        
+        # SECTION 15: Recommendations
+        report += f"""
+
+    🔧 PERFORMANCE RECOMMENDATIONS
+    {'-'*30}"""
+        
+        recommendations = []
+        
+        if perfect_rate < 0.3:
+            recommendations.append("• Consider tuning similarity thresholds - low perfect match rate")
+        if hit_5 > 0.8 and f1_5 < 0.5:
+            recommendations.append("• System finds good matches but struggles with multi-activity requirements")
+        if success_1 < 0.4:
+            recommendations.append("• Consider improving ranking/scoring - top predictions often incorrect")
+        if coverage < 0.95:
+            recommendations.append("• Consider lowering minimum similarity threshold for better coverage")
+        
+        # Score component recommendations
+        if metadata and 'score_analysis' in metadata:
+            score_analysis = metadata['score_analysis']
+            if 'Semantic_Score' in score_analysis:
+                semantic_stats = score_analysis['Semantic_Score']
+                if semantic_stats['mean'] < 0.3:
+                    recommendations.append("• Semantic scores are low - consider different semantic model")
+            
+            if 'Domain_Score' in score_analysis:
+                domain_stats = score_analysis['Domain_Score']
+                if domain_stats['non_zero_count'] / domain_stats['count'] < 0.5:
+                    recommendations.append("• Many zero domain scores - check aerospace term coverage")
+        
+        # Dependency recommendations
+        if metadata and 'dependencies' in metadata:
+            deps = metadata['dependencies']
+            if deps.get('sentence_transformers') == 'Not installed':
+                recommendations.append("• Install sentence-transformers for enhanced semantic similarity")
+            if deps.get('sklearn') == 'Not installed':
+                recommendations.append("• Install scikit-learn for TF-IDF domain term extraction")
+        
+        if recommendations:
+            for rec in recommendations:
+                report += f"\n{rec}"
+        else:
+            report += "\n• System performance appears well-tuned for current requirements"
+        
+        # SECTION 16: Configuration Summary for Version Tracking
+        report += f"""
+
+    📋 CONFIGURATION SUMMARY (for version comparison)
+    {'-'*48}"""
+        
+        config_hash_components = []
+        if metadata and 'algorithm_parameters' in metadata:
+            params = metadata['algorithm_parameters']
+            config_hash_components.extend([
+                f"threshold:{params.get('min_similarity_threshold', 'unk')}",
+                f"topn:{params.get('top_n_matches', 'unk')}"
+            ])
+        
+        if metadata and 'score_weights' in metadata:
+            weights = metadata['score_weights']
+            weights_str = '|'.join([f"{k}:{v}" for k, v in sorted(weights.items())])
+            config_hash_components.append(f"weights:{weights_str}")
+        
+        config_signature = ' | '.join(config_hash_components) if config_hash_components else 'Unknown configuration'
+        report += f"""
+    Configuration Signature: {config_signature}
+    Evaluation Date: {metadata.get('timestamp', 'Unknown') if metadata else 'Unknown'}
+    F1@5 Score: {f1_5:.3f}
+    Hit@5 Score: {hit_5:.1%}
+
+    Copy this summary for version comparison tracking.
     """
         
-        if hit_5 > f1_5 * 2:
-            report += "Large gap suggests many requirements have multiple valid activities."
-        elif hit_5 > f1_5 * 1.5:
-            report += "Moderate gap suggests some requirements have multiple valid activities."
-        else:
-            report += "Small gap suggests most requirements have single ground truth activities."
-        
-        return report
+        return report    
     
     def _save_results_enhanced(self):
         """Save enhanced results."""
