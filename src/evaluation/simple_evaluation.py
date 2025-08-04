@@ -1123,23 +1123,23 @@ class FixedSimpleEvaluator:
         
         # Multi-label assessment
         if f1_5 >= 0.7 and coverage >= 0.8:
-            report += "\n🚀 MULTI-LABEL: Excellent - Strong performance finding all ground truth activities"
+            report += "\n   🚀 MULTI-LABEL: Excellent - Strong performance finding all ground truth activities"
         elif f1_5 >= 0.5 and coverage >= 0.6:
-            report += "\n✅ MULTI-LABEL: Good - Solid performance with room for improvement"
+            report += "\n   ✅ MULTI-LABEL: Good - Solid performance with room for improvement"
         elif f1_5 >= 0.3:
-            report += "\n📈 MULTI-LABEL: Moderate - Acceptable but needs parameter tuning"
+            report += "\n   📈 MULTI-LABEL: Moderate - Acceptable but needs parameter tuning"
         else:
-            report += "\n🔧 MULTI-LABEL: Needs work - Consider algorithm improvements"
+            report += "\n   🔧 MULTI-LABEL: Needs work - Consider algorithm improvements"
         
         # Practical assessment
         if hit_5 >= 0.8:
-            report += "\n🎯 PRACTICAL: Excellent - Finds useful matches for most requirements"
+            report += "\n   🎯 PRACTICAL: Excellent - Finds useful matches for most requirements"
         elif hit_5 >= 0.6:
-            report += "\n🎯 PRACTICAL: Good - Finds useful matches for majority of requirements"
+            report += "\n   🎯 PRACTICAL: Good - Finds useful matches for majority of requirements"
         elif hit_5 >= 0.4:
-            report += "\n🎯 PRACTICAL: Moderate - Finds useful matches for some requirements"
+            report += "\n   🎯 PRACTICAL: Moderate - Finds useful matches for some requirements"
         else:
-            report += "\n🎯 PRACTICAL: Poor - Struggles to find useful matches"
+            report += "\n   🎯 PRACTICAL: Poor - Struggles to find useful matches"
         
         # SECTION 14: Key Insights
         report += f"""
@@ -1160,11 +1160,11 @@ class FixedSimpleEvaluator:
         if hit_5 > 0 and f1_5 > 0:
             gap_ratio = hit_5 / f1_5
             if gap_ratio > 2:
-                report += "\nLarge gap suggests many requirements have multiple valid activities."
+                report += "\n   Large gap suggests many requirements have multiple valid activities."
             elif gap_ratio > 1.5:
-                report += "\nModerate gap suggests some requirements have multiple valid activities."
+                report += "\n   Moderate gap suggests some requirements have multiple valid activities."
             else:
-                report += "\nSmall gap suggests most requirements have single ground truth activities."
+                report += "\n   Small gap suggests most requirements have single ground truth activities."
         
         # SECTION 15: Recommendations
         report += f"""
@@ -1175,13 +1175,13 @@ class FixedSimpleEvaluator:
         recommendations = []
         
         if perfect_rate < 0.3:
-            recommendations.append("• Consider tuning similarity thresholds - low perfect match rate")
+            recommendations.append("    • Consider tuning similarity thresholds - low perfect match rate")
         if hit_5 > 0.8 and f1_5 < 0.5:
-            recommendations.append("• System finds good matches but struggles with multi-activity requirements")
+            recommendations.append("    • System finds good matches but struggles with multi-activity requirements")
         if success_1 < 0.4:
-            recommendations.append("• Consider improving ranking/scoring - top predictions often incorrect")
+            recommendations.append("    • Consider improving ranking/scoring - top predictions often incorrect")
         if coverage < 0.95:
-            recommendations.append("• Consider lowering minimum similarity threshold for better coverage")
+            recommendations.append("    • Consider lowering minimum similarity threshold for better coverage")
         
         # Score component recommendations
         if metadata and 'score_analysis' in metadata:
@@ -1251,12 +1251,12 @@ class FixedSimpleEvaluator:
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # Save metrics
-        metrics_file = output_dir / "fixed_simple_metrics.json"
+        metrics_file = output_dir / "evaluation_metrics.json"
         with open(metrics_file, 'w') as f:
             json.dump(self.results['metrics'], f, indent=2)
         
         # Save report with proper UTF-8 encoding
-        report_file = output_dir / "fixed_simple_evaluation_report.txt"
+        report_file = output_dir / "matching_evaluation_report.txt"
         with open(report_file, 'w', encoding='utf-8') as f:
             f.write(self.results['report'])
         

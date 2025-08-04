@@ -749,10 +749,10 @@ class AerospaceMatcher:
         # Default aerospace-optimized weights
         if weights is None:
             weights = {
-                'semantic': 1,        # Moderate - general models struggle with aerospace
-                'bm25': 3,           # High - term matching crucial in technical domains
+                'semantic': 0,        # Moderate - general models struggle with aerospace
+                'bm25': 0,           # High - term matching crucial in technical domains
                 'domain': 1,         # High - aerospace terms are key
-                'query_expansion': 1  # Moderate - helps with sparse activities 
+                'query_expansion': 0 # Moderate - helps with sparse activities 
             }
             logger.info("🚀 Using aerospace-optimized weights")
         

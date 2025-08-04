@@ -998,7 +998,7 @@ class EnhancedRequirementAnalyzer:
         return df
     
     def _create_excel_report(self, df: pd.DataFrame, base_filename: str) -> Path:
-        """Create comprehensive 4-tab Excel report."""
+        """Create comprehensive 4-tab Excel report with enhanced formatting."""
         output_file = self.file_handler.get_structured_path(
             'quality_analysis', 
             "requirements_quality_report.xlsx"
@@ -1046,32 +1046,277 @@ class EnhancedRequirementAnalyzer:
             semantic_df = df[semantic_cols]
             semantic_df.to_excel(writer, sheet_name='Semantic Analysis', index=False)
             
-            # Format worksheets
-            workbook = writer.book
-            for sheet_name in workbook.sheetnames:
-                worksheet = workbook[sheet_name]
-                
-                # Format headers
-                for cell in worksheet[1]:
-                    cell.font = Font(bold=True)
-                    cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
-                    cell.font = Font(color="FFFFFF", bold=True)
-                
-                # Auto-adjust column widths
-                for column in worksheet.columns:
-                    max_length = 0
-                    column_letter = column[0].column_letter
-                    for cell in column:
-                        try:
-                            if len(str(cell.value)) > max_length:
-                                max_length = len(str(cell.value))
-                        except:
-                            pass
-                    adjusted_width = min(max_length + 2, 50)
-                    worksheet.column_dimensions[column_letter].width = adjusted_width
+            # Apply enhanced formatting
+            self._format_excel_workbook(writer)
         
         return excel_path
     
+    def _format_excel_workbook(self, writer):
+        """Apply enhanced formatting with tables, auto-sizing, and conditional formatting."""
+        try:
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
+            from openpyxl.worksheet.table import Table, TableStyleInfo
+            
+            workbook = writer.book
+            
+            # Define formatting styles
+            header_font = Font(name='Calibri', size=11, bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            
+            # Grade colors for conditional formatting
+            grade_fills = {
+                'EXCELLENT': PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid"),
+                'GOOD': PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid"),
+                'FAIR': PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"),
+                'POOR': PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid"),
+                'CRITICAL': PatternFill(start_color="FF5050", end_color="FF5050", fill_type="solid")
+            }
+            
+            # Format each worksheet
+            for sheet_name in workbook.sheetnames:
+                worksheet = workbook[sheet_name]
+                
+                try:
+                    # Special handling for Summary sheet - NO TABLE, just formatting
+                    if sheet_name == 'Summary':
+                        # Format headers
+                        if worksheet.max_row > 0:
+                            for cell in worksheet[1]:
+                                if cell.value:
+                                    cell.font = Font(bold=True, size=12)
+                                    cell.fill = PatternFill(start_color="E6E6E6", end_color="E6E6E6", fill_type="solid")
+                                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                        
+                        # Auto-fit columns for Summary
+                        for column_cells in worksheet.columns:
+                            column_letter = get_column_letter(column_cells[0].column)
+                            
+                            # Calculate max width
+                            max_length = 0
+                            for cell in column_cells:
+                                try:
+                                    if cell.value:
+                                        max_length = max(max_length, len(str(cell.value)))
+                                except:
+                                    pass
+                            
+                            # Set width with reasonable limits
+                            adjusted_width = min(max_length + 2, 150)
+                            worksheet.column_dimensions[column_letter].width = max(adjusted_width, 15)
+                        
+                        # Add styling to section headers
+                        for row_idx in range(2, worksheet.max_row + 1):
+                            section_cell = worksheet.cell(row_idx, 1)
+                            if section_cell.value and section_cell.value.strip() and worksheet.cell(row_idx, 2).value == '':
+                                # This is a section header
+                                for col_idx in range(1, 5):
+                                    cell = worksheet.cell(row_idx, col_idx)
+                                    cell.font = Font(bold=True, size=11)
+                                    cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+                        
+                        logger.info("✓ Formatted Summary (no table)")
+                    
+                    # Create Excel tables for data tabs
+                    else:
+                        # Determine the table range
+                        max_row = worksheet.max_row
+                        max_col = worksheet.max_column
+                        
+                        if max_row > 1 and max_col > 0:  # Ensure there's data beyond headers
+                            # Create table reference
+                            table_ref = f"A1:{get_column_letter(max_col)}{max_row}"
+                            
+                            # Clean table name
+                            table_name = sheet_name.replace(' ', '_')
+                            
+                            # Create and add table
+                            tab = Table(displayName=table_name, ref=table_ref)
+                            style = TableStyleInfo(
+                                name="TableStyleMedium9", 
+                                showFirstColumn=False,
+                                showLastColumn=False, 
+                                showRowStripes=True, 
+                                showColumnStripes=False
+                            )
+                            tab.tableStyleInfo = style
+                            worksheet.add_table(tab)
+                            logger.info(f"✓ Created table for {sheet_name}")
+                        
+                        # Apply column-specific formatting
+                        for column_cells in worksheet.columns:
+                            column_letter = get_column_letter(column_cells[0].column)
+                            
+                            # Skip empty columns
+                            if not any(cell.value for cell in column_cells):
+                                continue
+                            
+                            # Get column header name
+                            header_value = column_cells[0].value
+                            column_name = str(header_value) if header_value else ""
+                            
+                            # Calculate max width based on content
+                            max_length = 0
+                            for cell in column_cells:
+                                try:
+                                    if cell.value:
+                                        cell_value = str(cell.value)
+                                        lines = cell_value.split('\n')
+                                        max_line_length = max(len(line) for line in lines) if lines else len(cell_value)
+                                        max_length = max(max_length, max_line_length)
+                                except:
+                                    pass
+                            
+                            # Adjust width with a multiplier
+                            adjusted_width = min(max_length * 1.1 + 2, 100)
+                            
+                            # Apply column-specific constraints
+                            if 'Requirement Text' in column_name or 'Requirement_Text' in column_name:
+                                # Requirement Text: Wide with wrapping
+                                worksheet.column_dimensions[column_letter].width = max(50, min(adjusted_width, 80))
+                                
+                                # Apply wrap text
+                                for row_idx, cell in enumerate(column_cells, 1):
+                                    if row_idx > 1 and cell.value:
+                                        cell.alignment = Alignment(
+                                            wrap_text=True, 
+                                            vertical='top', 
+                                            horizontal='left'
+                                        )
+                            
+                            elif 'ID' in column_name:
+                                # ID columns: Narrow
+                                worksheet.column_dimensions[column_letter].width = max(8, min(adjusted_width, 15))
+                                
+                                for row_idx, cell in enumerate(column_cells, 1):
+                                    if row_idx > 1 and cell.value:
+                                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                            
+                            elif 'Score' in column_name:
+                                # Score columns: Medium width, centered
+                                worksheet.column_dimensions[column_letter].width = max(12, min(adjusted_width, 30))
+                                
+                                for row_idx, cell in enumerate(column_cells, 1):
+                                    if row_idx > 1 and cell.value:
+                                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                                        # Format scores
+                                        try:
+                                            if isinstance(cell.value, (int, float)):
+                                                if 'INCOSE' in column_name:
+                                                    cell.number_format = '0.0"%"'
+                                                else:
+                                                    cell.number_format = '0.0'
+                                        except:
+                                            pass
+                            
+                            elif 'Grade' in column_name:
+                                # Grade column: Apply conditional formatting
+                                worksheet.column_dimensions[column_letter].width = 15
+                                
+                                for row_idx, cell in enumerate(column_cells, 1):
+                                    if row_idx > 1 and cell.value:
+                                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                                        # Apply grade colors
+                                        if cell.value in grade_fills:
+                                            cell.fill = grade_fills[cell.value]
+                                            if cell.value in ['POOR', 'CRITICAL']:
+                                                cell.font = Font(color="FFFFFF", bold=True)
+                            
+                            elif any(keyword in column_name for keyword in ['Details', 'Suggestions', 'Missing', 'Found']):
+                                # Text detail columns: Wide
+                                worksheet.column_dimensions[column_letter].width = max(30, min(adjusted_width, 60))
+                                
+                                for row_idx, cell in enumerate(column_cells, 1):
+                                    if row_idx > 1 and cell.value:
+                                        cell.alignment = Alignment(
+                                            horizontal='left', 
+                                            vertical='top', 
+                                            wrap_text=True
+                                        )
+                            
+                            elif 'Name' in column_name:
+                                # Name columns: Medium width
+                                worksheet.column_dimensions[column_letter].width = max(20, min(adjusted_width, 40))
+                                
+                                for row_idx, cell in enumerate(column_cells, 1):
+                                    if row_idx > 1 and cell.value:
+                                        cell.alignment = Alignment(horizontal='left', vertical='center')
+                            
+                            else:
+                                # Default columns
+                                worksheet.column_dimensions[column_letter].width = max(12, min(adjusted_width, 40))
+                                
+                                for row_idx, cell in enumerate(column_cells, 1):
+                                    if row_idx > 1:
+                                        cell.alignment = Alignment(horizontal='center', vertical='center')
+                        
+                        
+                        # Set intelligent row heights
+                        for row_idx in range(2, worksheet.max_row + 1):
+                            has_wrapping_text = False
+                            max_text_length = 0
+                            
+                            for cell in worksheet[row_idx]:
+                                if cell.value:
+                                    cell_text = str(cell.value)
+                                    header_cell = worksheet.cell(1, cell.column)
+                                    column_name = str(header_cell.value) if header_cell.value else ""
+                                    
+                                    if 'Requirement Text' in column_name and len(cell_text) > 50:
+                                        has_wrapping_text = True
+                                        max_text_length = max(max_text_length, len(cell_text))
+                            
+                            # Set row height based on content
+                            if has_wrapping_text:
+                                estimated_lines = max(2, min(10, max_text_length // 80))
+                                worksheet.row_dimensions[row_idx].height = 30 + (estimated_lines * 12)
+                            else:
+                                worksheet.row_dimensions[row_idx].height = 20
+                    
+                    # Set header row height (all sheets)
+                    if worksheet.max_row >= 1:
+                        worksheet.row_dimensions[1].height = 25
+                    
+                    # Freeze panes (all sheets except Summary)
+                    if sheet_name != 'Summary':
+                        worksheet.freeze_panes = worksheet['A2']
+                    
+                    # Add borders to all cells with data
+                    thin_border = Border(
+                        left=Side(style='thin', color='E0E0E0'),
+                        right=Side(style='thin', color='E0E0E0'),
+                        top=Side(style='thin', color='E0E0E0'),
+                        bottom=Side(style='thin', color='E0E0E0')
+                    )
+                    
+                    for row in worksheet.iter_rows(min_row=1, max_row=worksheet.max_row, 
+                                                min_col=1, max_col=worksheet.max_column):
+                        for cell in row:
+                            if cell.value is not None:
+                                if cell.row == 1:  # Header row
+                                    cell.border = Border(
+                                        left=Side(style='medium'),
+                                        right=Side(style='medium'),
+                                        top=Side(style='medium'),
+                                        bottom=Side(style='medium')
+                                    )
+                                else:
+                                    cell.border = thin_border
+                    
+                    logger.info(f"✓ Formatted sheet: {sheet_name}")
+                
+                except Exception as e:
+                    logger.warning(f"Could not format sheet {sheet_name}: {e}")
+                    import traceback
+                    traceback.print_exc()
+        
+        except ImportError:
+            logger.warning("openpyxl styling not available - basic formatting applied")
+        except Exception as e:
+            logger.warning(f"Workbook formatting failed: {e}")
+            import traceback
+            traceback.print_exc()
+
     def _create_summary_tab(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create comprehensive summary tab with methodology."""
         summary_data = []
@@ -1142,11 +1387,11 @@ class EnhancedRequirementAnalyzer:
         # Quality Dimensions
         summary_data.extend([
             {'Section': 'QUALITY DIMENSIONS', 'Metric': '', 'Value': '', 'Details': ''},
-            {'Section': '', 'Metric': 'Clarity', 'Value': '', 'Details': 'Unambiguous language, active voice, reasonable length'},
-            {'Section': '', 'Metric': 'Completeness', 'Value': '', 'Details': 'Has actor, action, modal verb (shall/must/should)'},
-            {'Section': '', 'Metric': 'Verifiability', 'Value': '', 'Details': 'Measurable, testable, has acceptance criteria'},
-            {'Section': '', 'Metric': 'Atomicity', 'Value': '', 'Details': 'Single requirement, not multiple bundled'},
-            {'Section': '', 'Metric': 'Consistency', 'Value': '', 'Details': 'Uses consistent terminology, appropriate modal verbs'},
+            {'Section': '', 'Metric': 'Clarity', 'Value': '', 'Details': 'Uses unambiguous language, active voice, and concise structure so the intent is immediately understood without interpretation.'},
+            {'Section': '', 'Metric': 'Completeness', 'Value': '', 'Details': 'Uses unambiguous language, active voice, and concise structure so the intent is immediately understood without interpretation.'},
+            {'Section': '', 'Metric': 'Verifiability', 'Value': '', 'Details': 'States measurable acceptance criteria such that the requirements satisfaction can be proven by test, analysis, inspection, or demonstration.'},
+            {'Section': '', 'Metric': 'Atomicity', 'Value': '', 'Details': 'Specifies only a single behavior or constraint so it does not combine multiple requirements into one statement.'},
+            {'Section': '', 'Metric': 'Consistency', 'Value': '', 'Details': 'Maintains uniform terminology and correct use of modal verbs so it does not conflict with other requirements in the specification.'},
             {'Section': '', 'Metric': '', 'Value': '', 'Details': ''},
         ])
         

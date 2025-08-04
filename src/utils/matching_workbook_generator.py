@@ -234,6 +234,7 @@ class MatchingWorkbookGenerator:
         ])
         
         return pd.DataFrame(summary_data)    
+    
     def _create_confidence_tabs(self, enhanced_df: pd.DataFrame, writer):
         """Create confidence-based tabs - fixed to use correct column names."""
         
@@ -699,7 +700,7 @@ class MatchingWorkbookGenerator:
                             
                             elif any(keyword in column_name for keyword in ['Explanation', 'Evidence', 'Notes', 'Breakdown']):
                                 # Explanation columns: Medium width
-                                worksheet.column_dimensions[column_letter].width = max(25, min(adjusted_width, 50))
+                                worksheet.column_dimensions[column_letter].width = max(25, min(adjusted_width, 100))
                                 
                                 for row_idx, cell in enumerate(column_cells, 1):
                                     if row_idx > 1 and cell.value:
@@ -776,6 +777,7 @@ class MatchingWorkbookGenerator:
             logger.warning(f"Workbook formatting failed: {e}")
             import traceback
             traceback.print_exc()
+
 def create_matching_workbook(enhanced_df: pd.DataFrame, 
                            evaluation_results: Optional[Dict] = None,
                            output_path: str = "outputs/engineering_review/matching_workbook.xlsx",
