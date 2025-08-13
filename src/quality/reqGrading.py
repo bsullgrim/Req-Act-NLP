@@ -73,7 +73,7 @@ class INCOSEPatternAnalyzer:
                 'name': 'Functional/Performance',
                 'required': ['AGENT', 'FUNCTION', 'PERFORMANCE'],
                 'optional': ['INTERFACE_OUTPUT', 'TIMING', 'EVENT_TRIGGER', 'INTERFACE_INPUT', 'CONDITION'],
-                'template': "The {AGENT} shall {FUNCTION} in accordance with {INTERFACE_OUTPUT} with {PERFORMANCE} [and {TIMING} upon {EVENT_TRIGGER}] while in {CONDITION}",
+                'template': "The {AGENT} shall {FUNCTION} in accordance with {INTERFACE_OUTPUT} with {PERFORMANCE} [and {TIMING} upon {EVENT_TRIGGER} in accordance with {INTERFACE_INPUT}] while in {CONDITION}",
                 'description': "Specifies what the system shall do and how well"
             },
             'suitability': {
@@ -1388,7 +1388,7 @@ class EnhancedRequirementAnalyzer:
         summary_data.extend([
             {'Section': 'QUALITY DIMENSIONS', 'Metric': '', 'Value': '', 'Details': ''},
             {'Section': '', 'Metric': 'Clarity', 'Value': '', 'Details': 'Uses unambiguous language, active voice, and concise structure so the intent is immediately understood without interpretation.'},
-            {'Section': '', 'Metric': 'Completeness', 'Value': '', 'Details': 'Uses unambiguous language, active voice, and concise structure so the intent is immediately understood without interpretation.'},
+            {'Section': '', 'Metric': 'Completeness', 'Value': '', 'Details': 'Explicitly states all necessary information, including actors, actions, objects, conditions, and performance criteria so the requirement is fully defined.'},
             {'Section': '', 'Metric': 'Verifiability', 'Value': '', 'Details': 'States measurable acceptance criteria such that the requirements satisfaction can be proven by test, analysis, inspection, or demonstration.'},
             {'Section': '', 'Metric': 'Atomicity', 'Value': '', 'Details': 'Specifies only a single behavior or constraint so it does not combine multiple requirements into one statement.'},
             {'Section': '', 'Metric': 'Consistency', 'Value': '', 'Details': 'Maintains uniform terminology and correct use of modal verbs so it does not conflict with other requirements in the specification.'},
@@ -1398,7 +1398,7 @@ class EnhancedRequirementAnalyzer:
         # INCOSE Patterns
         summary_data.extend([
             {'Section': 'INCOSE PATTERNS', 'Metric': '', 'Value': '', 'Details': ''},
-            {'Section': '', 'Metric': 'Functional/Performance', 'Value': '', 'Details': 'The {AGENT} shall {FUNCTION} in accordance with {INTERFACE_OUTPUT} with {PERFORMANCE} [and {TIMING} upon {EVENT_TRIGGER}] while in {CONDITION}'},
+            {'Section': '', 'Metric': 'Functional/Performance', 'Value': '', 'Details': 'The {AGENT} shall {FUNCTION} in accordance with {INTERFACE_OUTPUT} with {PERFORMANCE} [and {TIMING} upon {EVENT_TRIGGER} in accordance with {INTERFACE_INPUT}] while in {CONDITION}'},
             {'Section': '', 'Metric': 'Suitability', 'Value': '', 'Details': 'The {AGENT} shall exhibit {CHARACTERISTIC} with {PERFORMANCE} while {CONDITION} [for {CONDITION_DURATION}]'},
             {'Section': '', 'Metric': 'Environmental', 'Value': '', 'Details': 'The {AGENT} shall exhibit {CHARACTERISTIC} during/after exposure to {ENVIRONMENT} [for {EXPOSURE_DURATION}]'},
             {'Section': '', 'Metric': 'Design Constraint', 'Value': '', 'Details': 'The {AGENT} shall exhibit {DESIGN_CONSTRAINTS} [in accordance with {PERFORMANCE} while in {CONDITION}]'},

@@ -384,7 +384,7 @@ class DomainKnowledgeBuilder:
         clusters = []
         if len(req_texts) > 1:
             # Basic similarity clustering
-            for i, text1 in enumerate(req_texts[:10]):  # Limit for performance
+            for i, text1 in enumerate(req_texts):  # Limit for performance
                 similar_texts = []
                 for j, text2 in enumerate(req_texts):
                     if i != j and self._simple_text_similarity(text1, text2) > 0.3:
@@ -396,7 +396,7 @@ class DomainKnowledgeBuilder:
                         'similar_requirements': similar_texts[:3]
                     })
         
-        return {'requirement_clusters': clusters[:10]}
+        return {'requirement_clusters': clusters}
     
     def _derive_matching_rules(self, traces_df: pd.DataFrame) -> Dict:
         """Derive high-level matching rules from successful traces."""
