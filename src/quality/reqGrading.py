@@ -572,9 +572,10 @@ class EnhancedRequirementAnalyzer:
         if readability < 30:
             issues.append(f"Clarity (medium): low readability score ({readability:.1f}/100)")
             severity_counts["medium"] += 1
+            clarity_issues += 1
         
-        clarity_score = max(0, 100 - (clarity_issues * 20 + len(passive_issues) * 10))
-        clarity_score = max(0, 100 - (clarity_issues * 10))
+        clarity_score = max(0, 100 - (clarity_issues * 20))
+
         return clarity_issues, clarity_score
     
     def _analyze_completeness(self, doc, text: str, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
@@ -593,15 +594,15 @@ class EnhancedRequirementAnalyzer:
         # Check for subject
         has_subject = any(token.dep_ == "nsubj" for token in doc)
         if not has_subject:
-            issues.append("Completeness (high): Missing subject/actor")
-            severity_counts["high"] += 1
+            issues.append("Completeness (critical): Missing subject/actor")
+            severity_counts["critical"] += 1
             completeness_issues += 1
         
         # Check for action
         has_verb = any(token.pos_ == "VERB" for token in doc)
         if not has_verb:
-            issues.append("Completeness (high): Missing action/verb")
-            severity_counts["high"] += 1
+            issues.append("Completeness (critical): Missing action/verb")
+            severity_counts["critical"] += 1
             completeness_issues += 1
         
         # Length check
@@ -611,7 +612,7 @@ class EnhancedRequirementAnalyzer:
             severity_counts["medium"] += 1
             completeness_issues += 1
         
-        completeness_score = max(0, 100 - (completeness_issues * 15))
+        completeness_score = max(0, 100 - (completeness_issues * 40))
         return completeness_issues, completeness_score
     
     def _analyze_verifiability(self, doc, text: str, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
@@ -643,11 +644,11 @@ class EnhancedRequirementAnalyzer:
                     break
         
         if not has_verifiable_criteria:
-            issues.append("Verifiability (high): no measurable criteria found")
-            severity_counts["high"] += 1
+            issues.append("Verifiability (critical): no measurable criteria found")
+            severity_counts["critical"] += 1
             verifiability_issues += 1
         
-        verifiability_score = max(0, 100 - (verifiability_issues * 20))
+        verifiability_score = max(0, 100 - (verifiability_issues * 40))
         return verifiability_issues, verifiability_score
     
     def _analyze_atomicity(self, doc, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
@@ -682,10 +683,11 @@ class EnhancedRequirementAnalyzer:
                 if token.text.lower() in verbs:
                     modal_found = True
                     break
-            if modal_found:
-                break
-        
-        return 100 if modal_found else 80
+            if not modal_found:
+                issues.append("Consistency (high): No modal verb for requirement strength")
+                severity_counts["high"] += 1
+                return 50  
+        return 100
     
     def _check_implementation_details(self, text: str, issues: List[str], severity_counts: Dict[str, int]):
         """Check for implementation details"""
@@ -793,19 +795,31 @@ class EnhancedRequirementAnalyzer:
             issues, metrics, incose_analysis, semantic_analysis = self.analyze_requirement(req_text, req_id)
             
             # Build comprehensive result
+            has_critical = metrics.severity_breakdown['critical'] > 0
+            base_score = (
+                metrics.clarity_score * 0.2 + 
+                metrics.completeness_score * 0.2 + 
+                metrics.verifiability_score * 0.25 +  # Increase weight for verifiability
+                metrics.atomicity_score * 0.15 +      # Decrease weight for atomicity
+                metrics.consistency_score * 0.2
+            )
+            if has_critical:
+            # Critical failures cap the score at 40 (POOR grade max)
+                quality_score = min(base_score, 40)
+            else:
+                quality_score = base_score
+
             result = {
+
                 # Core columns
                 'ID': req_id,
                 'Requirement Name': req_name,
                 'Requirement Text': req_text,
                 
                 # Quality scores
-                'Quality_Score': metrics.clarity_score * 0.2 + metrics.completeness_score * 0.2 + 
-                                metrics.verifiability_score * 0.2 + metrics.atomicity_score * 0.2 + 
-                                metrics.consistency_score * 0.2,
-                'Quality_Grade': self._get_grade(metrics.clarity_score * 0.2 + metrics.completeness_score * 0.2 + 
-                                                metrics.verifiability_score * 0.2 + metrics.atomicity_score * 0.2 + 
-                                                metrics.consistency_score * 0.2),
+                'Quality_Score': quality_score,
+                'Quality_Grade': self._get_grade(quality_score),
+
                 
                 # Quality breakdown
                 'Clarity_Score': metrics.clarity_score,

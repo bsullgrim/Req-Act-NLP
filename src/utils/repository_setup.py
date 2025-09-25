@@ -29,6 +29,7 @@ class RepositoryStructureManager:
             'evaluation_dashboards': self.base_dir / "evaluation_results" / "dashboards",
             'engineering_review': self.base_dir / "engineering_review",
             'quality_analysis': self.base_dir / "quality_analysis",
+            'visuals_output': self.base_dir / "visuals",
             
             # Source directories
             'src_matching': Path("src/matching"),
