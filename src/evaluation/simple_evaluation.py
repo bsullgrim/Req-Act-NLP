@@ -646,24 +646,28 @@ class FixedSimpleEvaluator:
                         if 'semantic' in explanations:
                             semantic_text = explanations['semantic']
                             metadata['matcher_info']['semantic_details'] = semantic_text
-                            
-                            # Try to extract model type
-                            if 'spacy' in semantic_text.lower():
-                                metadata['semantic_method'] = 'spaCy'
-                            elif 'transformer' in semantic_text.lower():
-                                metadata['semantic_method'] = 'Transformer'
-                            elif 'sentence' in semantic_text.lower():
-                                metadata['semantic_method'] = 'SentenceTransformer'
+                            if isinstance(semantic_text, str):
+                                if 'spacy' in semantic_text.lower():
+                                    metadata['semantic_method'] = 'spaCy'
+                                elif 'transformer' in semantic_text.lower():
+                                    metadata['semantic_method'] = 'Transformer'
+                                elif 'sentence' in semantic_text.lower():
+                                    metadata['semantic_method'] = 'SentenceTransformer'
+                            else:
+                                # If it's a dict, optionally store keys or a summary
+                                metadata['semantic_method'] = 'Unknown (dict format)'
                             
                         # Extract domain scoring details
                         if 'domain' in explanations:
                             domain_text = explanations['domain']
                             metadata['matcher_info']['domain_details'] = domain_text
-                            
-                            # Count domain terms mentioned
-                            domain_terms_mentioned = len(re.findall(r'aerospace|domain|weight', domain_text.lower()))
+                            if isinstance(domain_text, str):
+                                domain_terms_mentioned = len(re.findall(r'aerospace|domain|weight', domain_text.lower()))
+                            else:
+                                # For dicts, count the keys you care about
+                                domain_terms_mentioned = len(domain_text.keys()) if isinstance(domain_text, dict) else 0
                             metadata['domain_terms_in_explanation'] = domain_terms_mentioned
-                            
+                                                        
             except Exception as e:
                 print(f"   ⚠️ Could not parse explanations file: {e}")
         

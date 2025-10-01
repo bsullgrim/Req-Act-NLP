@@ -432,164 +432,124 @@ class AerospaceMatcher:
         return normalized_score, explanation
     
     def compute_domain_similarity(self, req_terms: List[str], act_terms: List[str], 
-                                domain_weights: Dict[str, float]) -> Tuple[float, str]:
+                                domain_weights: Dict[str, float]) -> Tuple[float, Dict]:
         """
-        Compute domain-specific similarity using ALL extracted domain knowledge.
-        
-        Args:
-            req_terms: List of requirement terms (already tokenized)
-            act_terms: List of activity terms (already tokenized)
-            domain_weights: Domain weight dictionary
-            
+        Compute domain-specific similarity with rich structured explanation.
         Returns:
-            Tuple of (score, explanation_string)
+            final_score: float
+            explanation: dict with detailed evidence
         """
         score = 0.0
-        explanation_parts = []
-        
-        # Convert to sets for efficient operations
+        explanation = {
+            "aerospace_terms": [],
+            "key_indicators": {},
+            "learned_relationships": {},
+            "phrases": [],
+            "weighted_terms": {},
+            "multi_evidence_bonus": 0,
+            "resource_provenance": {},
+            "final_score": 0.0
+        }
+
         req_set = set(req_terms)
         act_set = set(act_terms)
-        
-        # 1. Aerospace vocabulary overlap (baseline functionality)
+
+        # 1. Aerospace vocabulary overlap
         req_aero = req_set & self.all_aerospace_terms
         act_aero = act_set & self.all_aerospace_terms
-        
-        if req_aero and act_aero:
-            # Both contain aerospace terms - check overlap
-            overlap = req_aero & act_aero
-            if overlap:
-                vocab_score = 0.3 + (0.1 * min(len(overlap) - 1, 3))  # More overlap = higher score
-                explanation_parts.append(f"{len(overlap)} aerospace terms")
-            else:
-                vocab_score = 0.15  # Both have aerospace terms but different ones
+        shared_aero = req_aero & act_aero
+        if shared_aero:
+            vocab_score = 0.3 + (0.1 * min(len(shared_aero)-1, 3))
             score += vocab_score
+            explanation["aerospace_terms"] = list(shared_aero)
         elif req_aero or act_aero:
-            score += 0.1  # Only one has aerospace terms
-        
-        # 2. Strong indicator words from matching rules
-        if hasattr(self.domain, 'get_strong_indicator_words'):
+            score += 0.1
+
+        # 2. Key indicators
+        if hasattr(self.domain, "get_strong_indicator_words"):
             strong_indicators = self.domain.get_strong_indicator_words()
-            shared_words = req_set & act_set
-            indicator_matches = shared_words & strong_indicators
-            
+            indicator_matches = req_set & act_set & strong_indicators
             if indicator_matches:
-                # Weight by frequency in matching rules
                 indicator_score = 0.0
-                if hasattr(self.domain, 'matching_rules'):
-                    rules = self.domain.matching_rules.get('strong_indicators', {})
-                    for word in indicator_matches:
-                        rule_key = f'shared_word:{word}'
-                        if rule_key in rules:
-                            # More frequent in manual traces = higher weight
-                            frequency = rules[rule_key]
-                            indicator_score += min(0.1 * (frequency / 10), 0.15)
-                        else:
-                            indicator_score += 0.05
-                else:
-                    # Fallback if no frequency data
-                    indicator_score = min(len(indicator_matches) * 0.1, 0.3)
-                
+                for term in indicator_matches:
+                    weight = 0.05
+                    rules = getattr(self.domain, "matching_rules", {}).get("strong_indicators", {})
+                    rule_key = f"shared_word:{term}"
+                    if rule_key in rules:
+                        weight = min(0.1 * (rules[rule_key] / 10), 0.15)
+                    indicator_score += weight
+                    explanation["key_indicators"][term] = {"weight": weight, "source": "matching_rules"}
                 score += indicator_score
-                explanation_parts.append(f"{len(indicator_matches)} key indicators")
-        
-        # 3. Term co-occurrence relationships from extracted knowledge
-        if hasattr(self.domain, 'get_domain_cooccurrence_score'):
-            cooccurrence_score = self.domain.get_domain_cooccurrence_score(req_set, act_set)
-            if cooccurrence_score > 0:
-                weighted_score = cooccurrence_score * 0.4  # High weight for learned relationships
-                score += weighted_score
-                explanation_parts.append("learned term relationships")
-        
-        # 4. Phrase pattern detection using ACTUAL extracted patterns
-        if hasattr(self.domain, 'phrase_patterns'):
+
+        # 3. Learned term relationships
+        if hasattr(self.domain, "get_domain_cooccurrence_score"):
+            co_score = self.domain.get_domain_cooccurrence_score(req_set, act_set)
+            if co_score > 0:
+                score += co_score * 0.4
+                # capture which terms contributed
+                relationships = {}
+                for req_term in req_set:
+                    co_terms = set(self.domain.cooccurrence_terms.get(req_term, [])) & act_set
+                    if co_terms:
+                        relationships[req_term] = list(co_terms)
+                explanation["learned_relationships"] = relationships
+
+        # 4. Phrase patterns
+        matched_phrases = []
+        if hasattr(self.domain, "phrase_patterns"):
             phrase_score = 0.0
-            matched_phrases = []
-            
-            # Check requirement patterns
-            req_patterns = self.domain.phrase_patterns.get('requirement_patterns', {})
-            for phrase, count in req_patterns.items():
-                if count >= 2:  # Only use patterns that appear multiple times
-                    # Check if all words in the phrase appear in both req and act
-                    phrase_words = set(phrase.split())
-                    if phrase_words.issubset(req_set) and phrase_words.issubset(act_set):
-                        # Higher count = more important pattern
-                        pattern_score = 0.1 + min(0.1 * (count / 10), 0.1)
-                        phrase_score += pattern_score
-                        matched_phrases.append(phrase)
-            
-            # Check activity patterns
-            act_patterns = self.domain.phrase_patterns.get('activity_patterns', {})
-            for phrase, count in act_patterns.items():
-                if count >= 2 and len(matched_phrases) < 3:  # Limit total phrases
-                    phrase_words = set(phrase.split())
-                    if phrase_words.issubset(req_set) and phrase_words.issubset(act_set):
-                        pattern_score = 0.1 + min(0.1 * (count / 10), 0.1)
-                        phrase_score += pattern_score
-                        matched_phrases.append(phrase)
-            
+            for ph_type in ["requirement_patterns", "activity_patterns"]:
+                patterns = self.domain.phrase_patterns.get(ph_type, {})
+                for phrase, count in patterns.items():
+                    if count >= 2 and len(matched_phrases) < 3:
+                        words = set(phrase.split())
+                        if words.issubset(req_set) and words.issubset(act_set):
+                            phrase_score += 0.1
+                            matched_phrases.append({"phrase": phrase, "type": ph_type, "frequency": count})
             if phrase_score > 0:
-                score += min(phrase_score, 0.4)  # Cap phrase contribution
-                explanation_parts.append(f"phrases: {', '.join(matched_phrases[:2])}")
-        
-        # 5. Domain weight analysis (original functionality enhanced)
-        req_domain_terms = [term for term in req_terms if term in domain_weights]
-        act_domain_terms = [term for term in act_terms if term in domain_weights]
-        
-        if req_domain_terms and act_domain_terms:
-            common_domain = set(req_domain_terms) & set(act_domain_terms)
-            if common_domain:
-                # Use domain weights but boost if they're also in our extracted knowledge
-                domain_score = 0.0
-                for term in common_domain:
-                    base_weight = domain_weights[term]
-                    
-                    # Boost if term appears in strong indicators
-                    if hasattr(self.domain, 'get_strong_indicator_words'):
-                        if term in self.domain.get_strong_indicator_words():
-                            base_weight *= 1.5
-                    
-                    # Boost if term is aerospace
-                    if term in self.all_aerospace_terms:
-                        base_weight *= 1.2
-                    
-                    domain_score += base_weight
-                
-                # Normalize but less aggressively
-                norm_factor = max(len(req_domain_terms), len(act_domain_terms))
-                domain_score = domain_score / norm_factor if norm_factor > 0 else 0
-                score += min(domain_score, 0.3)
-                
-                top_weighted = sorted([(t, domain_weights[t]) for t in common_domain], 
-                                    key=lambda x: x[1], reverse=True)[:2]
-                if top_weighted:
-                    explanation_parts.append(f"weighted: {', '.join([t for t, _ in top_weighted])}")
-        
+                score += min(phrase_score, 0.4)
+                explanation["phrases"] = matched_phrases
+
+        # 5. Weighted domain terms
+        req_domain_terms = [t for t in req_terms if t in domain_weights]
+        act_domain_terms = [t for t in act_terms if t in domain_weights]
+        common_domain = set(req_domain_terms) & set(act_domain_terms)
+        weighted_terms = {}
+        if common_domain:
+            domain_score = 0.0
+            for term in common_domain:
+                w = domain_weights[term]
+                boosts = []
+                if hasattr(self.domain, "get_strong_indicator_words") and term in strong_indicators:
+                    w *= 1.5
+                    boosts.append("strong_indicator")
+                if term in self.all_aerospace_terms:
+                    w *= 1.2
+                    boosts.append("aerospace_term")
+                domain_score += w
+                weighted_terms[term] = {"weight": w, "boosts": boosts}
+            norm_factor = max(len(req_domain_terms), len(act_domain_terms))
+            domain_score = domain_score / norm_factor if norm_factor > 0 else 0
+            score += min(domain_score, 0.3)
+            explanation["weighted_terms"] = weighted_terms
+
         # 6. Multi-evidence bonus
-        evidence_types = sum([
-            1 if any('aerospace' in p for p in explanation_parts) else 0,
-            1 if any('indicator' in p for p in explanation_parts) else 0,
-            1 if any('relationship' in p for p in explanation_parts) else 0,
-            1 if any('phrase' in p for p in explanation_parts) else 0,
-            1 if any('weighted' in p for p in explanation_parts) else 0
-        ])
-        
+        evidence_types = sum(1 for k in ["aerospace_terms","key_indicators","learned_relationships","phrases","weighted_terms"] 
+                            if explanation[k])
         if evidence_types >= 3:
             bonus = 0.1 + (0.05 * (evidence_types - 3))
             score += bonus
-            explanation_parts.append(f"{evidence_types} evidence types")
-        
-        # Cap and create explanation
-        final_score = min(score, 1.0)
-        
-        # Build explanation string
-        if explanation_parts:
-            explanation = f"Domain: {' + '.join(explanation_parts)}"
-        else:
-            explanation = "Domain: minimal overlap"
-        
-        return final_score, explanation    
+            explanation["multi_evidence_bonus"] = bonus
 
+        # 7. Resource provenance
+        explanation["resource_provenance"] = self.domain.get_resource_status()
+
+        # 8. Final score
+        final_score = min(score, 1.0)
+        explanation["final_score"] = final_score
+
+        return final_score, explanation
+   
     def expand_query_aerospace(self, query_terms: List[str], activity_terms: List[str]) -> Tuple[float, str]:
         """
         UNIFIED: Query expansion using aerospace synonyms with activity expansion.
@@ -635,19 +595,16 @@ class AerospaceMatcher:
         # Score: What fraction of requirement terms are addressed by expanded activity?
         score = overlap_count / len(req_terms_set) if req_terms_set else 0.0
         
-        # Create detailed explanation
-        if overlap_count > 0:
-            matched_terms = list(overlap_terms)[:3]  # Show first 3 matches
-            explanation = f"Activity expansion: {overlap_count}/{len(req_terms_set)} req terms matched"
-            if expansion_count > 0:
-                explanation += f" (expanded {expansion_count} synonyms)"
-            explanation += f" via [{', '.join(matched_terms)}]"
-        else:
-            explanation = f"Activity expansion: 0/{len(req_terms_set)} req terms matched"
-            if expansion_count > 0:
-                explanation += f" (tried {expansion_count} synonyms)"
-        
-        return score, explanation
+        # Build details dictionary
+        details = {
+            "explanation": f"Activity expansion: {overlap_count}/{len(req_terms_set)} req terms matched"
+                        + (f" (expanded {expansion_count} synonyms)" if expansion_count else ""),
+            "requirement_terms": list(req_terms_set),
+            "expanded_activity_terms": list(expanded_activity_terms),
+            "matched_terms": list(overlap_terms)
+        }
+
+        return score, details
     
     def compute_comprehensive_similarity(self, req_doc, act_doc, req_terms: List[str],
                                     act_terms: List[str], corpus_stats: Dict[str, Any],

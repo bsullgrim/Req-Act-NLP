@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class QualityMetrics:
     """Container for requirement quality metrics."""
+    quality_score: float
     clarity_score: float
     completeness_score: float
     verifiability_score: float
@@ -100,39 +101,376 @@ class INCOSEPatternAnalyzer:
         }
         
         # Component extraction patterns
+
         self.component_patterns = {
             'PERFORMANCE': [
-                r'within\s+\d+(?:\.\d+)?\s*\w+',
-                r'at\s+least\s+\d+(?:\.\d+)?',
-                r'with\s+\d+(?:\.\d+)?%?\s*\w*',
-                r'±\s*\d+(?:\.\d+)?',
-                r'accuracy\s+of\s+\d+(?:\.\d+)?',
-                r'throughput\s+of\s+\d+(?:\.\d+)?'
+                # ========== PERCENTAGE PATTERNS (Most Specific First) ==========
+                # Percentage with comparative operators
+                r'(?:less\s+than|fewer\s+than|below|under)\s+\d+(?:\.\d+)?\s*(?:%|percent)\s+(?:variation|degradation|error|deviation)\b',
+                r'(?:at\s+least|minimum\s+of|no\s+less\s+than|greater\s+than|more\s+than|exceeds?|above)\s+\d+(?:\.\d+)?\s*(?:%|percent)\b',
+                r'(?:at\s+most|maximum\s+of|no\s+more\s+than|less\s+than|fewer\s+than|below|under)\s+\d+(?:\.\d+)?\s*(?:%|percent)\b',
+                r'(?:equal\s+to|exactly|precisely)\s+\d+(?:\.\d+)?\s*(?:%|percent)\b',
+                r'(?:between|from|ranging\s+from)\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?\s*(?:%|percent)\b',
+                
+                # Percentage with tolerance (±)
+                r'(?:within\s+)?(?:±|plus\s+or\s+minus)\s*\d+(?:\.\d+)?\s*(?:%|percent)\b',
+                
+                # Standalone percentage
+                r'\d+(?:\.\d+)?\s*(?:%|percent)\s+(?:of|or\s+(?:more|less|higher|lower|greater))\b',
+                r'\d+(?:\.\d+)?\s*%\s+(?:accuracy|precision|efficiency|effectiveness|reliability|availability)\b',
+                
+                # ========== TEMPERATURE PATTERNS (PERFORMANCE levels) ==========
+                # Temperature with tolerance (±)
+                r'(?:within\s+)?(?:±|plus\s+or\s+minus)\s*\d+(?:\.\d+)?\s*(?:°C|°F|K|celsius|fahrenheit|kelvin|degrees?)\b',
+                r'(?:±|plus\s+or\s+minus)\s*\d+(?:\.\d+)?\s*(?:°C|°F|K|degrees?)\s+(?:of|from|around)\b',
+                
+                # Temperature ranges
+                r'temperature\s+(?:range\s+)?(?:of\s+|from\s+|between\s+)?(?:-?\d+(?:\.\d+)?)\s*(?:to\s+(?:-?\d+(?:\.\d+)?)\s*)?(?:°C|°F|K|celsius|fahrenheit|kelvin)\b',
+                r'(?:thermal\s+)?(?:cycling|variation|gradient|shock)\s+(?:of\s+|from\s+|between\s+)?\d+(?:\.\d+)?\s*(?:°C|°F|K)\b',
+                
+                # Temperature levels (specific values)
+                r'temperature\s+(?:of\s+|at\s+)?(?:-?\d+(?:\.\d+)?)\s*(?:°C|°F|K)\b',
+                r'(?:at|within)\s+(?:-?\d+(?:\.\d+)?)\s*(?:to\s+(?:-?\d+(?:\.\d+)?)\s*)?(?:°C|°F|K)\b',
+                
+                # ========== TIME PATTERNS WITH UNITS ==========
+                r'within\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|μs|microseconds?|ns|nanoseconds?|sec|seconds?|min|minutes?|hr|hours?|days?|weeks?|months?|years?)\b',
+                r'(?:within\s+)?(?:±|plus\s+or\s+minus)\s*\d+\s+days?\b',
+                r'(?:after|following|before|prior\s+to)\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|sec|seconds?|min|minutes?|hr|hours?|days?|weeks?)\b',
+                
+                # ========== TOLERANCE PATTERNS WITH UNITS ==========
+                # General tolerance with physical units
+                r'(?:within\s+)?(?:±|plus\s+or\s+minus)\s*\d+(?:\.\d+)?\s*(?:V|A|W|kg|g|m|cm|mm|km|ft|in|Pa|psi|Hz|rpm|N|lbf)\b',
+                r'(?:±|plus\s+or\s+minus|tolerance\s+of)\s*\d+(?:\.\d+)?\s*(?:%|percent|ppm|parts?\s+per\s+million)\b',
+                r'up\s+to\s+\d+(?:\.\d+)?\s*(?:km|meters?|m|kg|g|W|V|A|Hz|years?|months?|days?|hours?)\b',
+                r'(?:accuracy|precision|resolution|tolerance|error)\s+(?:of\s+)?(?:±|less\s+than\s+|better\s+than\s+)?\d+(?:\.\d+)?\s*(?:%|ppm|bits?|degrees?|°|meters?|m|km|feet?|ft|inches?|in)\b',
+                
+                # ========== SPECIFIC UNIT PATTERNS ==========
+                # Aerospace thrust/force
+                r'(?:thrust|force)\s+(?:of\s+)?(?:up\s+to\s+|at\s+least\s+|minimum\s+|maximum\s+)?\d+(?:\.\d+)?\s*(?:N|newtons?|lbf|pounds?\s+force|kN|kilonewtons?)\b',
+                
+                # Velocity/speed
+                r'(?:velocity|speed)\s+(?:of\s+)?(?:up\s+to\s+|at\s+least\s+)?\d+(?:\.\d+)?\s*(?:m/s|meters?\s+per\s+second|km/h|mph|ft/s|knots?)\b',
+                
+                # Power/energy
+                r'(?:power|consumption|energy)\s+(?:of\s+)?(?:less\s+than\s+|maximum\s+|minimum\s+)?\d+(?:\.\d+)?\s*(?:W|watts?|kW|kilowatts?|mW|milliwatts?|kWh|Wh)\b',
+                
+                # Electrical
+                r'(?:voltage|current)\s+(?:of\s+)?(?:±|tolerance\s+)?\d+(?:\.\d+)?\s*(?:V|volts?|A|amps?|amperes?|mA|milliamps?|kV|mV)\b',
+                
+                # Mechanical environment (PERFORMANCE levels - "how well")
+                r'(?:vibration|acceleration|shock|impact)\s+(?:of\s+|up\s+to\s+)?(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|\d+\^\-?\d+)\s*(?:g|G|m/s²|Hz|grms)\b',
+                r'(?:mechanical\s+)?(?:stress|strain|load|loading|force)\s+(?:of\s+|up\s+to\s+)?\d+(?:\.\d+)?\s*(?:Pa|psi|N|lbf|MPa|kPa)\b',
+                
+                # Pressure levels (PERFORMANCE - measurable criteria)
+                r'(?:pressure|vacuum)\s+(?:of\s+|range\s+|from\s+|between\s+)?(?:\d+(?:\.\d+)?\s*(?:to\s+\d+(?:\.\d+)?\s*)?)?(?:Pa|psi|torr|atm|bar|mbar|kPa|MPa)\b',
+                
+                # Humidity levels (PERFORMANCE - specific values)
+                r'(?:humidity|moisture|condensation)\s+(?:of\s+|from\s+|between\s+)?\d+(?:\.\d+)?\s*(?:to\s+\d+(?:\.\d+)?\s*)?(?:%|percent|RH)\b',
+                
+                # Altitude levels (PERFORMANCE - specific values)
+                r'(?:altitude|elevation)\s+(?:of\s+|from\s+|between\s+|up\s+to\s+)?\d+(?:\.\d+)?\s*(?:to\s+\d+(?:\.\d+)?\s*)?(?:m|meters?|km|ft|feet)\b',
+                
+                # Radiation dose levels (PERFORMANCE - measurable criteria)
+                r'(?:total\s+ionizing\s+dose|TID|total\s+dose)\s+(?:of\s+|up\s+to\s+)?\d+(?:\.\d+)?\s*(?:rad|krad|Mrad|Gy|kGy)\b',
+                
+                # Frequency/rate
+                r'(?:frequency|rate|bandwidth)\s+(?:of\s+)?(?:up\s+to\s+|at\s+least\s+)?\d+(?:\.\d+)?\s*(?:Hz|hertz|kHz|MHz|GHz|rpm|revolutions?\s+per\s+minute|cycles?\s+per\s+second)\b',
+                
+                # Mass/weight
+                r'(?:mass|weight)\s+(?:of\s+)?(?:less\s+than\s+|maximum\s+|minimum\s+)?\d+(?:\.\d+)?\s*(?:kg|kilograms?|g|grams?|lb|pounds?|oz|ounces?|tons?|mg|milligrams?)\b',
+                
+                # Distance/length/range
+                r'(?:distance|length|range)\s+(?:of\s+)?(?:up\s+to\s+|at\s+least\s+|minimum\s+|maximum\s+)?\d+(?:\.\d+)?\s*(?:m|meters?|km|kilometers?|ft|feet|miles?|nautical\s+miles?|mm|cm|in|inches?)\b',
+                
+                # Data rate/throughput/bandwidth
+                r'(?:data\s+rate|throughput|bandwidth|bitrate)\s+(?:of\s+)?(?:up\s+to\s+|at\s+least\s+|minimum\s+)?\d+(?:\.\d+)?\s*(?:bps|bits?\s+per\s+second|kbps|Mbps|Gbps|bytes?\s+per\s+second|Bps|KBps|MBps|GBps)\b',
+                
+                # Latency/delay
+                r'(?:latency|delay|response\s+time)\s+(?:of\s+)?(?:less\s+than\s+|no\s+more\s+than|maximum\s+)?\d+(?:\.\d+)?\s*(?:ms|millisecond(?:s)?|μs|microsecond(?:s)?|sec|second(?:s)?)\b'
+                
+                # Storage/memory/capacity
+                r'(?:capacity|storage|memory|size)\s+(?:of\s+)?(?:at\s+least\s+|minimum\s+|maximum\s+)?\d+(?:\.\d+)?\s*(?:B|bytes?|KB|MB|GB|TB|PB|kilobytes?|megabytes?|gigabytes?|terabytes?|petabytes?)\b',
+                
+                # dB/km (signal attenuation)
+                r'\d+(?:\.\d+)?\s*dB/km',
+                
+                # Wavelength (with μm or corrupted ?m)
+                r'\d+(?:\.\d+)?\s*(?:μm|µm|\?m|um|micrometers?|microns?)\s+wavelength',
+                r'at\s+\d+(?:\.\d+)?\s*(?:μm|µm|\?m|um|micrometers?)',
+                
+                # ========== RELIABILITY/AVAILABILITY PATTERNS ==========
+                r'(?:MTBF|mean\s+time\s+between\s+failures?)\s+(?:of\s+)?(?:at\s+least\s+|minimum\s+)?\d+(?:\.\d+)?\s*(?:hours?|days?|years?|FIT)\b',
+                r'(?:MTTR|mean\s+time\s+to\s+repair|mean\s+time\s+to\s+recovery)\s+(?:of\s+)?(?:less\s+than\s+|maximum\s+)?\d+(?:\.\d+)?\s*(?:minutes?|hours?)\b',
+                r'(?:availability|uptime|reliability)\s+(?:of\s+)?(?:at\s+least\s+|minimum\s+)?\d+(?:\.\d+)?%\b',
+                r'(?:failure\s+rate|probability\s+of\s+failure)\s+(?:of\s+)?(?:less\s+than\s+)?\d+(?:\.\d+)?(?:E[-+]?\d+)?\s*(?:per\s+hour|per\s+year|%|percent)?\b',
+                
+                # Readiness levels (can be both PERFORMANCE and DESIGN_CONSTRAINTS)
+                r'\b(?:TRL|MRL|IRL|SRL)\s+\d+\b',
+
+                # ========== GENERIC COMPARATIVE PATTERNS (Less Specific - Last) ==========
+                r'(?:at\s+least|minimum\s+of|no\s+less\s+than|greater\s+than|more\s+than|exceeds?|above)\s+\d+(?:\.\d+)?\s*(?:km|meters?|m|kg|g|hours?|days?|years?)\b',
+                r'(?:at\s+most|maximum\s+of|no\s+more\s+than|less\s+than|fewer\s+than|below|under)\s+\d+(?:\.\d+)?\s*(?:km|meters?|m|kg|g|hours?|days?|years?)\b',
+                r'(?:equal\s+to|exactly|precisely)\s+\d+(?:\.\d+)?\s*\w+\b',
+                r'(?:between|from|ranging\s+from)\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?\s*\w+\b',
+                
+                # ========== QUALITATIVE PERFORMANCE (Last Resort) ==========
+                r'in\s+accordance\s+with\s+(?:specification|standard|requirement|document)\s+[\w\d\-\.]+\b',
+                r'per\s+(?:specification|standard|requirement|document)\s+[\w\d\-\.]+\b'
             ],
+            
             'TIMING': [
-                r'within\s+\d+\s*(?:ms|milliseconds?|sec|seconds?|min|minutes?)',
-                r'upon\s+\w+',
-                r'during\s+\w+',
-                r'after\s+\d+\s*\w+'
+                # ABSOLUTE TIMING
+                r'within\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|μs|microseconds?|ns|nanoseconds?|sec|seconds?|min|minutes?|hr|hours?|days?)\b',
+                r'(?:after|following)\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|μs|sec|seconds?|min|minutes?|hr|hours?|days?)\b',
+                r'(?:before|prior\s+to)\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|sec|seconds?|min|minutes?|hr|hours?|days?)\b',
+                r'(?:in|after)\s+(?:less\s+than|no\s+more\s+than)\s+\d+(?:\.\d+)?\s*(?:ms|sec|seconds?|min|minutes?)\b',
+                r'(?:no\s+later\s+than|by)\s+\d+(?:\.\d+)?\s*(?:seconds?|minutes?|hours?|days?)\b',
+                
+                # MISSION/EVENT TIMING
+                r'(?:at\s+)?(?:T\s*[+-]\s*\d+|launch\s*[+-]\s*\d+|ignition\s*[+-]\s*\d+)\s*(?:seconds?|minutes?|hours?|days?)\b',
+                
+                # EVENT-BASED TIMING
+                r'(?:upon|on|when)\s+(?:receipt|reception|detection|occurrence|completion|initiation|activation|termination)\s+of\b',
+                r'(?:immediately\s+)?(?:upon|after|following|when)\s+(?:system\s+)?(?:startup|boot|initialization|power\s+on|power\s+up|reset|restart)\b',
+                r'(?:immediately\s+)?(?:upon|when|after)\s+(?:detection|occurrence)\s+of\s+(?:a\s+)?(?:fault|failure|error|anomaly|condition)\b',
+                r'(?:during|throughout|while)\s+(?:flight|mission|operations?|nominal\s+operations?|emergency|fault\s+conditions?|normal\s+mode)\b',
+                r'(?:at|upon|during)\s+(?:launch|liftoff|ignition|separation|deployment|orbit\s+insertion|docking|undocking|landing|touchdown)\b',
+                r'(?:before|prior\s+to)\s+(?:launch|liftoff|separation|deployment|maneuver|landing|shutdown)\b',
+                
+                # PERIODIC TIMING
+                r'(?:every|each)\s+\d+(?:\.\d+)?\s*(?:ms|milliseconds?|sec|seconds?|min|minutes?|hr|hours?|days?|orbits?|cycles?|revolutions?)\b',
+                r'(?:at\s+a\s+rate\s+of|frequency\s+of|at\s+intervals\s+of)\s+\d+(?:\.\d+)?\s*(?:Hz|hertz|times?\s+per\s+second|per\s+minute|per\s+hour|per\s+day)\b',
+                r'(?:once\s+per|per)\s+(?:orbit|revolution|cycle|pass|day|hour|minute|second)\b',
+                r'(?:continuously|constantly|perpetually)\s+(?:during|throughout|while)\b',
+                
+                # CONDITIONAL TIMING
+                r'(?:while|as\s+long\s+as|during\s+the\s+time\s+that|for\s+the\s+duration\s+of)\s+\w+',
+                r'(?:until|up\s+to\s+the\s+point\s+when)\s+\w+',
+                
+                # REAL-TIME
+                r'\b(?:real[- ]?time|instantaneous|immediate|without\s+delay)\b'
             ],
+            
             'CONDITION': [
-                r'while\s+[\w\s]+',
-                r'during\s+[\w\s]+',
-                r'when\s+[\w\s]+',
-                r'if\s+[\w\s]+',
-                r'under\s+[\w\s]+'
+                # OPERATIONAL CONDITIONS
+                r'(?:while|during|when)\s+(?:in\s+)?(?:normal|nominal|standby|emergency|fault|degraded|safe|backup|redundant)\s+(?:mode|operation|conditions?|state)\b',
+                r'(?:while|during|when)\s+(?:powered|unpowered|on|off|active|inactive|enabled|disabled|energized|de-energized)\b',
+                r'(?:while|during|when)\s+(?:the\s+)?(?:system|subsystem|component|unit|equipment)\s+is\s+(?:operating|running|functional|available|operational|online|offline)\b',
+                
+                # FAULT/FAILURE CONDITIONS
+                r'(?:if|when|in\s+the\s+event\s+that|upon)\s+(?:a\s+)?(?:fault|failure|error|anomaly|malfunction|problem)\s+(?:occurs?|is\s+detected|happens)\b',
+                r'(?:in\s+the\s+absence\s+of|without|lacking)\s+(?:a\s+)?(?:fault|failure|error|signal|input|power|communication)\b',
+                
+                # GENERAL CONDITIONS
+                r'(?:under|in)\s+(?:all|any|specified|given|defined|normal|abnormal)\s+(?:conditions?|circumstances|scenarios|situations)\b',
+                r'(?:subject\s+to|provided\s+that|assuming\s+that|given\s+that)\s+\w+',
+                
+                # ENVIRONMENTAL CONDITIONS
+                r'(?:while|during|when)\s+(?:exposed\s+to|experiencing|subjected\s+to|in)\s+(?:temperature|thermal|vibration|shock|radiation|vacuum|pressure)\s+(?:conditions?|environment)\b',
+                r'(?:while|during|when)\s+(?:in\s+)?(?:space|orbit|atmospheric|terrestrial|ground|air|vacuum)\s+(?:environment|conditions?|phase)\b',
+                r'(?:while|during|when)\s+(?:in\s+)?(?:sunlight|eclipse|shadow|darkness|daylight|night)\b',
+                r'(?:at|under)\s+(?:atmospheric|vacuum|pressurized|unpressurized|ambient)\s+(?:pressure|conditions?)\b',
+                
+                # MISSION PHASE CONDITIONS
+                r'(?:during|throughout|while\s+in)\s+(?:pre-launch|launch|ascent|boost|on-orbit|orbital|re-entry|descent|landing|post-landing|ground)\s+(?:operations?|phase|period|stage)\b',
+                r'(?:while|during|when)\s+(?:docked|berthed|attached|separated|free-flying|autonomous|tethered)\b',
+                r'(?:during|throughout)\s+(?:mission|flight|operations?|deployment|commissioning|decommissioning|maintenance|servicing)\b',
+                
+                # SYSTEM STATE CONDITIONS
+                r'(?:while|when)\s+(?:receiving|transmitting|processing|computing|storing|monitoring|tracking|controlling)\s+\w+',
+                r'(?:while|when)\s+(?:connected\s+to|interfacing\s+with|communicating\s+with|linked\s+to)\s+\w+',
+                r'(?:if|when)\s+(?:commanded|requested|triggered|initiated|activated|executed)\s+(?:by|from|via)\s+\w+',
+                
+                # POWER CONDITIONS
+                r'(?:while|when)\s+(?:on\s+)?(?:battery|solar|primary|backup|emergency|redundant)\s+power\b',
+                r'(?:during|while)\s+(?:power\s+)?(?:up|down|cycling|switching|transfer|transition)\b',
+                r'(?:with|without)\s+(?:external|internal|primary|backup)\s+power\b',
+                
+                # LOGICAL CONDITIONS
+                r'(?:if\s+and\s+only\s+if|unless|except\s+when|provided\s+that)\s+\w+'
             ],
+            
             'ENVIRONMENT': [
-                r'temperature\s+[\w\s]*',
-                r'humidity\s+[\w\s]*',
-                r'pressure\s+[\w\s]*',
-                r'vibration\s+[\w\s]*',
-                r'radiation\s+[\w\s]*'
+                # THERMAL ENVIRONMENT (external physical conditions)
+                r'temperature\s+(?:range\s+)?(?:of\s+|from\s+|between\s+)?(?:-?\d+(?:\.\d+)?)\s*(?:to\s+(?:-?\d+(?:\.\d+)?)\s*)?(?:°C|°F|K|celsius|fahrenheit|kelvin)\b',
+                r'(?:thermal\s+)?(?:cycling|variation|gradient|shock|transient)\s+(?:of\s+|from\s+|between\s+)?\d+(?:\.\d+)?\s*(?:°C|°F|K)\b',
+                r'(?:hot|cold|cryogenic|extreme\s+temperature|thermal|heat|freezing)\s+(?:environment|conditions?|exposure)\b',
+                r'(?:operating|storage|survival)\s+temperature\s+(?:range)?\b',
+                
+                # PRESSURE ENVIRONMENT
+                r'(?:pressure|vacuum)\s+(?:environment|conditions?)\b',
+                r'(?:atmospheric|vacuum|space|ambient|absolute|gauge)\s+pressure\b',
+                r'(?:pressurized|unpressurized|vacuum|low\s+pressure|high\s+pressure)\s+(?:environment|conditions?|chamber)\b',
+                
+                # RADIATION ENVIRONMENT
+                r'(?:radiation|particle|cosmic\s+ray|solar\s+particle|Van\s+Allen|ionizing)\s+(?:environment|exposure|flux|dose)\b',
+                r'(?:ionizing|non-ionizing|electromagnetic|RF|microwave|gamma|x-ray|alpha|beta|neutron)\s+radiation\b',
+                r'(?:total\s+ionizing\s+dose|TID|total\s+dose)\s+(?:environment|exposure)\b',
+                r'(?:single\s+event|SEE|SEU|latch-?up)\s+(?:environment|susceptibility|rate)\b',
+                
+                # SPACE ENVIRONMENT
+                r'(?:space|orbital|deep\s+space|interplanetary|cislunar|lunar|martian|planetary)\s+(?:environment|conditions?)\b',
+                r'(?:micro)?gravity|weightless(?:ness)?|zero-g|reduced\s+gravity\b',
+                r'(?:solar\s+)?(?:wind|plasma|magnetic\s+field|flux)\s+(?:environment|conditions?)\b',
+                r'(?:eclipse|sunlight|solar\s+illumination|thermal\s+cycling|day-night\s+cycle)\s+(?:conditions?|environment)\b',
+                r'(?:atomic\s+oxygen|AO|plasma|debris|micrometeoroid)\s+(?:environment|exposure)\b',
+                
+                # HUMIDITY/MOISTURE ENVIRONMENT
+                r'(?:humidity|moisture|condensation)\s+(?:environment|conditions?)\b',
+                r'(?:wet|dry|humid|arid)\s+(?:environment|conditions?)\b',
+                
+                # CONTAMINATION ENVIRONMENT
+                r'(?:contamination|outgassing|particulate|molecular|chemical)\s+(?:environment|conditions?|requirements?|control)\b',
+                r'(?:clean\s+room|cleanroom|sterile|controlled|particle-free)\s+(?:environment|conditions?)\b',
+                r'(?:class|ISO)\s+\d+\s+(?:cleanroom|environment)\b',
+                
+                # CORROSION/CHEMICAL ENVIRONMENT
+                r'(?:corrosive|salt\s+spray|salt\s+fog|marine|industrial|chemical)\s+(?:environment|atmosphere|conditions?)\b',
+                
+                # MECHANICAL ENVIRONMENT (exposure types - NOT performance levels)
+                r'(?:vibration|shock|acoustic)\s+(?:environment|conditions?)\b',
+                r'(?:random|sinusoidal|pyroshock|seismic|launch|acoustic)\s+(?:environment)\b',
+                
+                # OPERATIONAL ENVIRONMENT TYPES
+                r'(?:ground|pre-launch|launch|ascent|on-orbit|re-entry|landing|surface)\s+(?:environment|conditions?|phase)\b',
+                r'(?:transportation|handling|storage|deployment|operational)\s+(?:environment|conditions?)\b',
+                
+                # EMI/EMC ENVIRONMENT
+                r'(?:EMI|EMC|electromagnetic\s+interference|electromagnetic\s+compatibility|ESD|electrostatic\s+discharge)\s+(?:environment|conditions?|requirements?)\b'
+            ],
+            
+            'CONDITION_DURATION': [
+                # Duration of CONDITION (for Suitability pattern)
+                r'for\s+(?:a\s+)?(?:duration\s+of\s+)?\d+(?:\.\d+)?\s*(?:hours?|days?|years?|cycles?|missions?|orbits?|operations?)\b',
+                r'over\s+(?:a\s+period\s+of\s+)?\d+(?:\.\d+)?\s*(?:hours?|days?|years?|missions?)\b',
+                r'throughout\s+(?:the\s+)?\d+(?:\.\d+)?\s*(?:hour|day|year|mission|orbit)\b',
+                r'during\s+\d+(?:\.\d+)?\s*(?:consecutive\s+)?(?:hours?|days?|cycles?)\b',
+            ],
+            
+            'EXPOSURE_DURATION': [
+                # Duration of ENVIRONMENT exposure (for Environment pattern)
+                r'for\s+(?:a\s+)?(?:duration\s+of\s+)?\d+(?:\.\d+)?\s*(?:seconds?|minutes?|hours?|days?)\s+(?:of\s+)?exposure\b',
+                r'during\s+\d+(?:\.\d+)?\s*(?:seconds?|minutes?|hours?|days?)\s+(?:of\s+)?exposure\b',
+                r'after\s+\d+(?:\.\d+)?\s*(?:seconds?|minutes?|hours?|days?)\s+(?:of\s+)?exposure\b',
+                r'exposed\s+for\s+\d+(?:\.\d+)?\s*(?:seconds?|minutes?|hours?|days?)\b',
+            ],
+            
+            'CHARACTERISTIC': [
+                # Quality attributes (these will be checked via word list in extract function)
+                # But add some multi-word patterns here
+                r'\b(?:fault\s+tolerance|fault\s+tolerant)\b',
+                r'\b(?:mean\s+time\s+between\s+failures?|MTBF)\b',
+                r'\b(?:mean\s+time\s+to\s+repair|MTTR)\b',
+                r'\b(?:single\s+point\s+of\s+failure|SPOF)\b',
+                r'\b(?:fail[-\s]?safe|fail[-\s]?operational)\b',
+                r'\b(?:high\s+availability|highly\s+available)\b'
+            ],
+            
+            'DESIGN_CONSTRAINTS': [
+                # Negative constraints
+                r'\b(?:shall\s+not|must\s+not|cannot|can\s+not|may\s+not)\b',
+                r'\b(?:prohibited\s+from|restricted\s+to|limited\s+to|constrained\s+by|confined\s+to)\b',
+                
+                # Quantitative limits
+                r'\b(?:no\s+more\s+than|not\s+to\s+exceed|maximum\s+of)\s+\d+',
+                
+                # Resource budgets/constraints
+                r'\b(?:mass|weight|power|size|volume|energy|cost)\s+(?:limit|constraint|budget|requirement|cap)\b',
+                r'\b(?:not\s+to\s+exceed|shall\s+not\s+exceed|limited\s+to)\s+\d+(?:\.\d+)?\s*(?:kg|W|m³|cm³|L)\b',
+                
+                # Interface constraints
+                r'\b(?:interface|mounting|physical|mechanical)\s+(?:constraint|requirement|limitation)\b',
+                
+                # Material/Manufacturing
+                r'\b(?:material|construction|manufacturing|fabrication)\s+(?:restriction|constraint|requirement|limitation)\b',
+                
+                # Technology Readiness Level (TRL)
+                r'\b(?:TRL|Technology\s+Readiness\s+Level)\s+(?:of\s+)?(?:at\s+least\s+|minimum\s+of\s+|≥\s*)?\d+(?:\s+or\s+(?:higher|greater|above))?\b',
+                
+                # Manufacturing Readiness Level (MRL)
+                r'\b(?:MRL|Manufacturing\s+Readiness\s+Level)\s+(?:of\s+)?(?:at\s+least\s+|minimum\s+of\s+|≥\s*)?\d+(?:\s+or\s+(?:higher|greater|above))?\b',
+                
+                # Standards/Compliance
+                r'\b(?:EMI|EMC|electromagnetic\s+(?:interference|compatibility))\s+(?:requirement|constraint|compliance)\b',
+                r'\b(?:standard|regulatory|specification)\s+(?:compliance|requirement|constraint)\b',
+                r'\bshall\s+comply\s+with\s+(?:MIL-STD|IEEE|ISO|CCSDS|DO-\d+)[-\s]?\d+\b',
+                
+                # Heritage/COTS
+                r'\b(?:heritage\s+hardware|COTS|commercial\s+off[-\s]the[-\s]shelf|existing\s+design)\b'
+            ],
+            
+            'INTERFACE_OUTPUT': [
+                r'\b(?:shall\s+)?(?:output|provide|supply|transmit|send|generate|produce)\s+(?:[a-zA-Z\s]+)?(?:signal|data|command|telemetry|status|message)\b',
+                r'\b(?:control|command|actuation)\s+(?:signal|output|data)\b',
+                r'\b(?:telemetry|status|health|diagnostic)\s+(?:data|information|output)\b',
+                r'\b(?:display|indication|alert|alarm|warning|notification)\s+(?:signal|output|message)\b'
+            ],
+            
+            'INTERFACE_INPUT': [
+                r'\b(?:shall\s+)?(?:receive|accept|acquire|input|capture|monitor)\s+(?:[a-zA-Z\s]+)?(?:signal|data|command|input|message)\b',
+                r'\b(?:sensor|measurement|telemetry)\s+(?:data|input|signal)\b',
+                r'\b(?:command|control|configuration)\s+(?:signal|data|input)\b',
+                r'\b(?:from|via)\s+(?:the\s+)?(?:operator|user|ground\s+station|external\s+system|interface)\b'
+            ],
+            
+            'EVENT_TRIGGER': [
+                r'\b(?:upon|on|when)\s+(?:receipt|reception|detection|occurrence)\s+of\s+(?:a\s+)?(?:[a-zA-Z\s]+)?(?:signal|command|message|event)\b',
+                r'\bupon\s+(?:system\s+)?(?:startup|boot|initialization|power\s+on|power\s+up|reset|restart)\b',
+                r'\b(?:when|upon)\s+(?:commanded|requested|triggered|initiated)\s+(?:by|from)\b',
+                r'\b(?:upon|when)\s+(?:detection|occurrence)\s+of\s+(?:a\s+)?(?:fault|failure|error|anomaly)\b',
+                r'\b(?:upon|at)\s+(?:launch|liftoff|separation|deployment|landing|touchdown)\b',
+                r'\b(?:when|if)\s+(?:threshold|limit|boundary)\s+(?:exceeded|reached|crossed)\b',
+                r'\b(?:upon|when)\s+(?:timer|timeout|countdown)\s+(?:expiration|completion)\b'
             ]
         }
-    
+
+
+        # Additional word lists for components that need semantic checking
+
+        CHARACTERISTIC_TERMS = {
+            # Quality attributes (-ilities)
+            "accuracy", "precision", "resolution", "sensitivity", "selectivity",
+            "reliability", "availability", "maintainability", "serviceability", "testability",
+            "security", "safety", "integrity", "confidentiality", "authenticity",
+            "performance", "efficiency", "effectiveness", "throughput", "responsiveness",
+            "latency", "bandwidth", "capacity", "scalability", "flexibility",
+            "compatibility", "interoperability", "portability", "modularity",
+            "robustness", "resilience", "stability", "repeatability", "reproducibility",
+            "linearity", "durability", "hardness", "strength", "stiffness",
+            "conductivity", "resistivity"
+        }
+
+
+        # Pattern usage examples aligned with INCOSE guidance
+
+        PATTERN_EXAMPLES = {
+            'Functional/Performance': {
+                'template': 'The {AGENT} shall {FUNCTION} in accordance with {INTERFACE_OUTPUT} with {PERFORMANCE} [and {TIMING} upon {EVENT_TRIGGER} in accordance with {INTERFACE_INPUT}] while in {CONDITION}',
+                'example': 'The navigation system shall calculate position with 10-meter accuracy within 5 seconds upon receipt of GPS signals while in normal operation mode',
+                'components': ['AGENT', 'FUNCTION', 'PERFORMANCE', 'TIMING', 'EVENT_TRIGGER', 'INTERFACE_INPUT', 'CONDITION']
+            },
+            
+            'Suitability': {
+                'template': 'The {AGENT} shall exhibit {CHARACTERISTIC} with {PERFORMANCE} while {CONDITION} [for {CONDITION_DURATION}]',
+                'example': 'The spacecraft shall exhibit 99.9% availability with MTBF of 10000 hours during nominal operations for 5 years',
+                'components': ['AGENT', 'CHARACTERISTIC', 'PERFORMANCE', 'CONDITION', 'CONDITION_DURATION']
+            },
+            
+            'Environment': {
+                'template': 'The {AGENT} shall exhibit {CHARACTERISTIC} during/after exposure to {ENVIRONMENT} [for {EXPOSURE_DURATION}]',
+                'example': 'The electronics shall exhibit full functionality after exposure to radiation environment for 1000 hours',
+                'components': ['AGENT', 'CHARACTERISTIC', 'ENVIRONMENT', 'EXPOSURE_DURATION']
+            },
+            
+            'Design': {
+                'template': 'The {AGENT} shall exhibit {DESIGN_CONSTRAINTS} [in accordance with {PERFORMANCE} while in {CONDITION}]',
+                'example': 'The system shall use COTS components with TRL 6 and mass not exceeding 50kg during all mission phases',
+                'components': ['AGENT', 'DESIGN_CONSTRAINTS', 'PERFORMANCE', 'CONDITION']
+            }
+        }
+
     def extract_incose_components(self, doc) -> Dict[str, Optional[str]]:
-        """Extract INCOSE requirement components."""
+        """Extract INCOSE requirement components with enhanced patterns."""
         components = {comp: None for comp in [
             'AGENT', 'FUNCTION', 'CHARACTERISTIC', 'PERFORMANCE', 'CONDITION',
             'ENVIRONMENT', 'TIMING', 'INTERFACE_OUTPUT', 'INTERFACE_INPUT',
@@ -141,45 +479,100 @@ class INCOSEPatternAnalyzer:
         
         text = doc.text
         text_lower = text.lower()
-        
-        # Extract AGENT (subject)
+        #     # DIAGNOSTIC CODE - ADD THIS
+        # if '±' in text or '%' in text or 'dB' in text or '?m' in text:
+        #     print(f"\n=== DIAGNOSTIC ===")
+        #     print(f"Text: {text[:100]}")
+        #     print(f"Has ±: {'±' in text}")
+        #     print(f"Has %: {'%' in text}")  
+        #     print(f"Has μ: {'μ' in text}")
+        #     print(f"Has ?: {'?' in text}")
+        #     print(f"Repr: {repr(text[:100])}")
+        #     print("==================\n")
+    
+        # ========== AGENT EXTRACTION (Enhanced NLP) ==========
         for token in doc:
             if token.dep_ == "nsubj" and not token.text.lower() in ["it", "this", "that"]:
-                components['AGENT'] = token.text
+                # Get full noun phrase including modifiers
+                agent_parts = []
+                
+                # Get determiners, adjectives, and compounds
+                for child in token.children:
+                    if child.dep_ in ["det", "amod", "compound", "nmod"]:
+                        agent_parts.append((child.i, child.text))
+                
+                # Add the main noun
+                agent_parts.append((token.i, token.text))
+                
+                # Sort by position and join
+                agent_parts.sort(key=lambda x: x[0])
+                components['AGENT'] = " ".join([part[1] for part in agent_parts])
                 break
         
-        # Extract FUNCTION (main verb + direct objects)
+        # ========== FUNCTION EXTRACTION (Enhanced NLP) ==========
         for token in doc:
             if token.pos_ == "VERB" and token.dep_ == "ROOT":
                 function_parts = [token.lemma_]
+                
+                # Include particles, direct objects, prepositions, and complements
                 for child in token.children:
-                    if child.dep_ in ["dobj", "prep", "prt"]:
+                    if child.dep_ in ["dobj", "prep", "prt", "xcomp"]:
                         function_parts.append(child.text)
+                        # Include prepositional objects
+                        if child.dep_ == "prep":
+                            for grandchild in child.children:
+                                if grandchild.dep_ == "pobj":
+                                    function_parts.append(grandchild.text)
+                
                 components['FUNCTION'] = " ".join(function_parts)
                 break
         
-        # Extract components using patterns
+        # ========== REGEX PATTERN EXTRACTION ==========
+        # Extract all components using patterns from self.component_patterns
         for comp_type, patterns in self.component_patterns.items():
+            # Skip AGENT and FUNCTION (handled by NLP above)
+            if comp_type in ['AGENT', 'FUNCTION']:
+                continue
+                
             for pattern in patterns:
-                match = re.search(pattern, text_lower, re.IGNORECASE)
-                if match and not components[comp_type]:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
                     components[comp_type] = match.group().strip()
-                    break
+                #     # ADD THIS DEBUG
+                #     print(f"MATCHED {comp_type}: matched='{match.group()}'")
+                # if match and not components[comp_type]:
+                #     components[comp_type] = match.group().strip()
+                #     # break
         
-        # Extract CHARACTERISTIC (quality attributes)
-        quality_terms = ["accuracy", "reliability", "availability", "security", "performance", 
-                        "efficiency", "maintainability", "usability", "compatibility"]
-        for token in doc:
-            if token.text.lower() in quality_terms:
-                components['CHARACTERISTIC'] = token.text
-                break
-
-        # Extract DESIGN_CONSTRAINTS
-        constraint_indicators = ["shall not", "must not", "cannot", "limited to", "constrained by"]
-        for indicator in constraint_indicators:
-            if indicator in text_lower:
-                components['DESIGN_CONSTRAINTS'] = indicator
-                break
+        # ========== CHARACTERISTIC EXTRACTION (Enhanced with word list) ==========
+        if not components['CHARACTERISTIC']:
+            # Expanded quality attributes
+            characteristic_terms = {
+                # Quality attributes
+                "accuracy", "precision", "resolution", "sensitivity", "selectivity",
+                "reliability", "availability", "maintainability", "serviceability", "testability",
+                "security", "safety", "integrity", "confidentiality", "authenticity",
+                
+                # Performance characteristics
+                "performance", "efficiency", "effectiveness", "throughput", "responsiveness",
+                "latency", "bandwidth", "capacity", "scalability", "flexibility",
+                
+                # Compatibility/Interoperability
+                "compatibility", "interoperability", "portability", "modularity",
+                
+                # Robustness
+                "robustness", "resilience", "stability", "repeatability", 
+                "reproducibility", "linearity",
+                
+                # Physical characteristics
+                "durability", "hardness", "strength", "stiffness", "conductivity", "resistivity"
+            }
+            
+            # Check for single-word characteristics
+            for token in doc:
+                if token.text.lower() in characteristic_terms:
+                    components['CHARACTERISTIC'] = token.text
+                    break
         
         return components
     
@@ -227,8 +620,8 @@ class INCOSEPatternAnalyzer:
         required_found = sum(1 for comp in pattern_def['required'] if components.get(comp))
         optional_found = sum(1 for comp in pattern_def['optional'] if components.get(comp))
         
-        required_score = (required_found / len(pattern_def['required'])) * 80
-        optional_bonus = (optional_found / len(pattern_def['optional'])) * 20 if pattern_def['optional'] else 0
+        required_score = (required_found / len(pattern_def['required'])) * 60
+        optional_bonus = (optional_found / len(pattern_def['optional'])) * 40  if pattern_def['optional'] else 0
         
         return min(100, required_score + optional_bonus)
     
@@ -509,6 +902,7 @@ class EnhancedRequirementAnalyzer:
         completeness_issues, completeness_score = self._analyze_completeness(doc, text, issues, severity_counts)
         consistency_score = self._analyze_consistency(doc, issues, severity_counts)
         
+
         # INCOSE pattern analysis
         incose_analysis = self.incose_analyzer.analyze_incose_compliance(text)
         
@@ -521,8 +915,24 @@ class EnhancedRequirementAnalyzer:
         # Calculate semantic score
         semantic_score = self._calculate_semantic_score(semantic_analysis)
         
+        # Build comprehensive result
+        has_critical = severity_counts['critical'] > 0
+        base_score = (
+            clarity_score * 0.2 + 
+            completeness_score * 0.2 + 
+            verifiability_score * 0.25 +  # Increase weight for verifiability
+            atomicity_score * 0.15 +      # Decrease weight for atomicity
+            consistency_score * 0.2
+        )
+        if has_critical:
+        # Critical failures cap the score at 40 (POOR grade max)
+            quality_score = min(base_score, 40)
+        else:
+            quality_score = base_score
+
         # Create metrics
         metrics = QualityMetrics(
+            quality_score= quality_score,
             clarity_score=clarity_score,
             completeness_score=completeness_score,
             verifiability_score=verifiability_score,
@@ -533,7 +943,7 @@ class EnhancedRequirementAnalyzer:
             total_issues=len(issues),
             severity_breakdown=severity_counts
         )
-        
+
         return issues, metrics, incose_analysis, semantic_analysis
     
     def _analyze_clarity(self, doc, text: str, issues: List[str], severity_counts: Dict[str, int]) -> Tuple[int, float]:
@@ -794,20 +1204,20 @@ class EnhancedRequirementAnalyzer:
             
             issues, metrics, incose_analysis, semantic_analysis = self.analyze_requirement(req_text, req_id)
             
-            # Build comprehensive result
-            has_critical = metrics.severity_breakdown['critical'] > 0
-            base_score = (
-                metrics.clarity_score * 0.2 + 
-                metrics.completeness_score * 0.2 + 
-                metrics.verifiability_score * 0.25 +  # Increase weight for verifiability
-                metrics.atomicity_score * 0.15 +      # Decrease weight for atomicity
-                metrics.consistency_score * 0.2
-            )
-            if has_critical:
-            # Critical failures cap the score at 40 (POOR grade max)
-                quality_score = min(base_score, 40)
-            else:
-                quality_score = base_score
+            # # Build comprehensive result
+            # has_critical = metrics.severity_breakdown['critical'] > 0
+            # base_score = (
+            #     metrics.clarity_score * 0.2 + 
+            #     metrics.completeness_score * 0.2 + 
+            #     metrics.verifiability_score * 0.25 +  # Increase weight for verifiability
+            #     metrics.atomicity_score * 0.15 +      # Decrease weight for atomicity
+            #     metrics.consistency_score * 0.2
+            # )
+            # if has_critical:
+            # # Critical failures cap the score at 40 (POOR grade max)
+            #     quality_score = min(base_score, 40)
+            # else:
+            #     quality_score = base_score
 
             result = {
 
@@ -817,8 +1227,8 @@ class EnhancedRequirementAnalyzer:
                 'Requirement Text': req_text,
                 
                 # Quality scores
-                'Quality_Score': quality_score,
-                'Quality_Grade': self._get_grade(quality_score),
+                'Quality_Score': metrics.quality_score,
+                'Quality_Grade': self._get_grade(metrics.quality_score),
 
                 
                 # Quality breakdown
@@ -912,14 +1322,15 @@ class EnhancedRequirementAnalyzer:
         # Add duplicate groups
         results_df = self._add_duplicate_groups(results_df, similarity_map)
         
-        # Save CSV results
-        if output_file is None:
-            output_file = Path(input_file_path).stem + "_quality_analysis"
+        # # Save CSV results
+        # if output_file is None:
+        #     output_file = Path(input_file_path).stem + "_quality_analysis"
         
-        csv_path = Path(output_file).with_suffix('.csv')
-        results_df.to_csv(csv_path, index=False)
-        logger.info(f"Saved CSV results to {csv_path}")
+        # csv_path = Path(output_file).with_suffix('.csv')
+        # results_df.to_csv(csv_path, index=False)
+        # logger.info(f"Saved CSV results to {csv_path}")
         
+        self._save_enhanced_results(results_df, input_file_path, output_file, excel_report)
         # Create Excel report if requested
         if excel_report:
             excel_path = self._create_excel_report(results_df, output_file)
@@ -939,35 +1350,36 @@ class EnhancedRequirementAnalyzer:
             input_stem = Path(input_file_path).stem
             output_file = self.file_handler.get_structured_path(
                 'quality_analysis', 
-                f"{input_stem}_enhanced_quality_report.csv"
+                f"{input_stem}_quality_report.csv"
             )
         
         # Save CSV
         try:
             df.to_csv(output_file, index=False, encoding='utf-8-sig')
+            df.to_json(Path(output_file).with_suffix('.json'), orient='records', indent=2, force_ascii=False)
             logger.info(f"Enhanced CSV analysis saved to '{output_file}'")
         except Exception as e:
             logger.error(f"Failed to save CSV: {e}")
             raise
         
-        # Save enhanced summary
-        summary_report = self._generate_enhanced_summary(df)
-        summary_file = str(Path(output_file).with_suffix("")) + "_enhanced_summary.json"
+        # # Save enhanced summary
+        # summary_report = self._generate_enhanced_summary(df)
+        # summary_file = str(Path(output_file).with_suffix("")) + "_enhanced_summary.json"
         
-        try:
-            with open(summary_file, "w", encoding='utf-8') as f:
-                json.dump(summary_report, f, indent=2, default=str, ensure_ascii=False)
-            logger.info(f"Enhanced summary saved to '{summary_file}'")
-        except Exception as e:
-            logger.warning(f"Could not save enhanced summary: {e}")
+        # try:
+        #     with open(summary_file, "w", encoding='utf-8') as f:
+        #         json.dump(summary_report, f, indent=2, default=str, ensure_ascii=False)
+        #     logger.info(f"Enhanced summary saved to '{summary_file}'")
+        # except Exception as e:
+        #     logger.warning(f"Could not save enhanced summary: {e}")
         
-        # Create enhanced Excel report
-        if excel_report:
-            try:
-                excel_path = self._create_enhanced_excel_report(df)
-                logger.info(f"Enhanced Excel report created: {excel_path}")
-            except Exception as e:
-                logger.error(f"Failed to create enhanced Excel report: {e}")
+        # # Create enhanced Excel report
+        # if excel_report:
+        #     try:
+        #         excel_path = self._create_enhanced_excel_report(df)
+        #         logger.info(f"Enhanced Excel report created: {excel_path}")
+        #     except Exception as e:
+        #         logger.error(f"Failed to create enhanced Excel report: {e}")
         
         return output_file
     

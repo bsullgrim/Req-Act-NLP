@@ -54,7 +54,7 @@ class SafeFileHandler:
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
         
-        encodings_to_try = ["utf-8", "latin-1", "cp1252", "iso-8859-1", "utf-16"]
+        encodings_to_try = ["utf-8","utf-8-sig", "latin-1", "cp1252", "iso-8859-1", "utf-16"]
         
         # Try detected encoding first
         detected_encoding = self.detect_encoding(str(file_path))

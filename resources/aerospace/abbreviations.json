@@ -13,5 +13,6 @@
   "s/c": "spacecraft",
   "fdir": "fault detection isolation recovery",
   "moc": "mission operations center",
-  "soc": "spacecraft operations center"
+  "soc": "spacecraft operations center",
+  "zblan": "zirconium barium lanthanum aluminum sodium fluoride"
 }
