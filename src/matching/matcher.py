@@ -20,7 +20,9 @@ from dataclasses import dataclass
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
+os.environ['TRANSFORMERS_OFFLINE'] = '1'  # Ensure transformers work offline
+os.environ['HF_Hub_OFFLINE'] = '1'
+os.environ['HF_DATASETS_OFFLINE'] = '1'
 # Import existing utils
 from src.utils.file_utils import SafeFileHandler
 from src.utils.path_resolver import SmartPathResolver
@@ -29,7 +31,7 @@ from src.matching.domain_resources import DomainResources
 # Optional dependencies
 try:
     from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
@@ -640,7 +642,7 @@ class AerospaceMatcher:
         """Create detailed match explanation."""
         
         # Calculate combined score
-        combined_score = sum(weights.get(key, 0) * score for key, score in scores.items())
+        combined_score = sum(weights.get(key, 0) * score for key, score in scores.items())/sum(weights.values())
         
         # Determine match quality
         if combined_score >= 0.6:
@@ -706,10 +708,10 @@ class AerospaceMatcher:
         # Default aerospace-optimized weights
         if weights is None:
             weights = {
-                'semantic': 1,        # Moderate - general models struggle with aerospace
-                'bm25': 1,           # High - term matching crucial in technical domains
-                'domain': 1,         # High - aerospace terms are key
-                'query_expansion': 1 # Moderate - helps with sparse activities 
+                'semantic': 0.2,        # Moderate - general models struggle with aerospace
+                'bm25': 0.4,           # High - term matching crucial in technical domains
+                'domain': 0.2,         # High - aerospace terms are key
+                'query_expansion': 0.2 # Moderate - helps with sparse activities 
             }
             logger.info("🚀 Using aerospace-optimized weights")
         
@@ -811,7 +813,7 @@ class AerospaceMatcher:
             
             # Sort and take top N (unchanged)
             activity_scores.sort(key=lambda x: x['combined_score'], reverse=True)
-            top_matches = activity_scores[:top_n]
+            top_matches = [m for m in activity_scores[:top_n] if m['combined_score'] >= min_similarity][:top_n]
             
             # Create match records (unchanged)
             for match in top_matches:
@@ -998,7 +1000,7 @@ def main():
         results_df, run_parameters = matcher.run_matching(
             requirements_file="requirements.csv",
             activities_file="activities.csv",
-            min_similarity=0.15,
+            min_similarity=0.3,
             top_n=5,
             output_file="aerospace_matches",
             save_explanations=True

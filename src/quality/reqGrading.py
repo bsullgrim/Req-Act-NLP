@@ -186,8 +186,8 @@ class INCOSEPatternAnalyzer:
                 r'(?:data\s+rate|throughput|bandwidth|bitrate)\s+(?:of\s+)?(?:up\s+to\s+|at\s+least\s+|minimum\s+)?\d+(?:\.\d+)?\s*(?:bps|bits?\s+per\s+second|kbps|Mbps|Gbps|bytes?\s+per\s+second|Bps|KBps|MBps|GBps)\b',
                 
                 # Latency/delay
-                r'(?:latency|delay|response\s+time)\s+(?:of\s+)?(?:less\s+than\s+|no\s+more\s+than|maximum\s+)?\d+(?:\.\d+)?\s*(?:ms|millisecond(?:s)?|μs|microsecond(?:s)?|sec|second(?:s)?)\b'
-                
+                r'(?:latency|delay|response\s+time)\s+(?:of\s+)?(?:less\s+than\s+|no\s+more\s+than\s+|maximum\s+)?\d+(?:\.\d+)?\s*(?:ms|millisecond(?:s)?|μs|microsecond(?:s)?|sec|second(?:s)?)\b',
+
                 # Storage/memory/capacity
                 r'(?:capacity|storage|memory|size)\s+(?:of\s+)?(?:at\s+least\s+|minimum\s+|maximum\s+)?\d+(?:\.\d+)?\s*(?:B|bytes?|KB|MB|GB|TB|PB|kilobytes?|megabytes?|gigabytes?|terabytes?|petabytes?)\b',
                 

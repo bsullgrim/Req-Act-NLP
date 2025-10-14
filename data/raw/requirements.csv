@@ -42,7 +42,7 @@ I.4,I.4 Resupply and Retrieval,The system shall accommodate resupply of raw mate
 I.3,I.3 Infrastructure Interface,"The system shall interface with the host space station or platform for power, thermal management, and structural support during test flights or as needed for repair and operational support on orbit"
 I.2,I.2 Telemetry Transmission,The system shall transmit manufacturing telemetry and product quality data to Earth in real-time.
 I.1,I.1 Command Reception,The system shall receive commands and software updates from ground control stations.
-F.19,F.19 Real-Time Data Transmission,The system shall transmit quality control data to Earth in real-time with a latency of no more than 1 second.
+F.19,F.19 Real-Time Data Transmission,The system shall transmit quality control data to Earth in real-time with a latency of no more than 2 seconds.
 F.18,F.18 Quality Control Redundancy,The system shall incorporate redundant quality control sensors with automatic failover capabilities to ensure continuous monitoring in case of sensor failure.
 F.17,F.17 In-situ Annealing,The system shall incorporate in-situ annealing capabilities to reduce internal stresses in the produced ZBLAN fibers.
 F.16,F.16 Fiber Diameter Control,The system shall control the diameter of the produced ZBLAN fiber within ±1% of the target diameter throughout the drawing process.
