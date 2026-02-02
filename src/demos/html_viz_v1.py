@@ -210,52 +210,91 @@ class TechnicalJourneyVisualizerHTML:
             background: white;
             border-radius: 8px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.1);
-            padding: 12px;
+            padding: 10px;
             aspect-ratio: 16/9;
             display: grid;
-            grid-template-columns: 0.8fr 1.2fr 1.3fr;
-            grid-template-rows: auto 1.2fr 1.3fr 0.9fr;
-            gap: 6px;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            grid-template-rows: auto 0.8fr 1.4fr 0.6fr 1fr 0.7fr;
+            gap: 5px;
             overflow: hidden;
         }}
 
         .title {{
             grid-column: 1 / -1;
             text-align: center;
-            font-size: 1.2em;
+            font-size: 1.1em;
             font-weight: bold;
             color: #2c3e50;
             margin-bottom: 0;
             border-bottom: 2px solid #3498db;
-            padding-bottom: 4px;
+            padding-bottom: 3px;
         }}
 
         .layer {{
             border: 1px solid #ecf0f1;
-            border-radius: 5px;
-            padding: 6px;
+            border-radius: 4px;
+            padding: 5px;
             background: #fafbfc;
             min-height: 0;
+            max-height: 100%;
             overflow: auto;
+            display: flex;
+            flex-direction: column;
+        }}
+
+        .layer > * {{
+            flex-shrink: 1;
+            min-height: 0;
+        }}
+
+        .layer::-webkit-scrollbar {{
+            width: 4px;
+            height: 4px;
+        }}
+
+        .layer::-webkit-scrollbar-track {{
+            background: #f1f1f1;
+        }}
+
+        .layer::-webkit-scrollbar-thumb {{
+            background: #888;
+            border-radius: 2px;
+        }}
+
+        .layer::-webkit-scrollbar-thumb:hover {{
+            background: #555;
         }}
 
         .layer-title {{
-            font-size: 0.8em;
+            font-size: 0.75em;
             font-weight: bold;
             color: #34495e;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
             border-left: 3px solid #3498db;
-            padding-left: 5px;
+            padding-left: 4px;
         }}
 
-        /* Grid layout for layers - adjusted proportions */
-        .layer-1 {{ grid-column: 1 / 2; grid-row: 2 / 3; }}
-        .layer-2 {{ grid-column: 2 / 3; grid-row: 2 / 3; }}
-        .layer-3 {{ grid-column: 3 / 4; grid-row: 2 / 3; }}
-        .layer-4 {{ grid-column: 1 / 2; grid-row: 3 / 4; }}
-        .layer-5 {{ grid-column: 2 / 4; grid-row: 3 / 4; }}
-        .layer-6 {{ grid-column: 1 / 2; grid-row: 4 / 5; }}
-        .layer-7 {{ grid-column: 2 / 4; grid-row: 4 / 5; }}
+        .layer-meta {{
+            font-size: 0.6em;
+            color: #7f8c8d;
+            font-style: italic;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }}
+
+        /* New optimized grid layout */
+        .layer-1 {{ grid-column: 1 / 3; grid-row: 2 / 3; }}
+        .layer-2 {{ grid-column: 3 / 5; grid-row: 2 / 3; }}
+        .layer-3 {{ grid-column: 1 / 5; grid-row: 3 / 4; }}
+        .layer-4 {{ grid-column: 1 / 2; grid-row: 4 / 5; }}
+        .layer-5 {{ grid-column: 2 / 5; grid-row: 4 / 5; }}
+        .layer-6 {{ grid-column: 1 / 2; grid-row: 5 / 6; }}
+        .layer-7 {{ grid-column: 2 / 5; grid-row: 5 / 6; }}
+
+        /* Layer 3 gets full width with 4-column algorithm grid */
+        .layer-3 .algorithm-grid {{
+            grid-template-columns: repeat(4, 1fr);
+        }}
         
         .input-box {{
             background: #e8f4fd;
@@ -280,9 +319,12 @@ class TechnicalJourneyVisualizerHTML:
 
         .algorithm-grid {{
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 4px;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 5px;
             margin: 3px 0;
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
         }}
 
         .algorithm-box {{
@@ -291,6 +333,10 @@ class TechnicalJourneyVisualizerHTML:
             padding: 4px;
             text-align: center;
             background: white;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            max-height: 100%;
         }}
 
         .algo-title {{
@@ -320,13 +366,31 @@ class TechnicalJourneyVisualizerHTML:
         }}
 
         .algo-details {{
-            font-size: 0.6em;
+            font-size: 0.65em;
             color: #7f8c8d;
-            margin-top: 2px;
+            margin-top: 3px;
             text-align: left;
-            line-height: 1;
-            max-height: 2.4em;
-            overflow: hidden;
+            line-height: 1.2;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+        }}
+
+        .algo-details::-webkit-scrollbar {{
+            width: 3px;
+        }}
+
+        .algo-details::-webkit-scrollbar-track {{
+            background: #f1f1f1;
+        }}
+
+        .algo-details::-webkit-scrollbar-thumb {{
+            background: #888;
+            border-radius: 2px;
+        }}
+
+        .algo-details::-webkit-scrollbar-thumb:hover {{
+            background: #555;
         }}
         
         .combination-section {{
@@ -435,6 +499,10 @@ class TechnicalJourneyVisualizerHTML:
 
         .components-analysis {{
             margin-top: 5px;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
         }}
 
         .component-summary {{
@@ -468,6 +536,22 @@ class TechnicalJourneyVisualizerHTML:
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 3px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }}
+
+        .components-list::-webkit-scrollbar {{
+            width: 3px;
+        }}
+
+        .components-list::-webkit-scrollbar-track {{
+            background: #f1f1f1;
+        }}
+
+        .components-list::-webkit-scrollbar-thumb {{
+            background: #888;
+            border-radius: 2px;
         }}
 
         .component-item {{
@@ -568,6 +652,22 @@ class TechnicalJourneyVisualizerHTML:
             grid-template-columns: 1fr;
             gap: 4px;
             margin-top: 5px;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }}
+
+        .quality-details::-webkit-scrollbar {{
+            width: 3px;
+        }}
+
+        .quality-details::-webkit-scrollbar-track {{
+            background: #f1f1f1;
+        }}
+
+        .quality-details::-webkit-scrollbar-thumb {{
+            background: #888;
+            border-radius: 2px;
         }}
 
         .semantic-analysis, .issues-summary {{
@@ -702,36 +802,43 @@ class TechnicalJourneyVisualizerHTML:
 
         <div class="layer layer-1">
             <div class="layer-title">Layer 1: Raw Inputs</div>
+            <div class="layer-meta">System receives requirement text and target activity for matching</div>
             {layer1_html}
         </div>
 
         <div class="layer layer-2">
             <div class="layer-title">Layer 2: Preprocessing</div>
+            <div class="layer-meta">Text tokenization, normalization, and key term extraction</div>
             {layer2_html}
         </div>
 
         <div class="layer layer-3">
             <div class="layer-title">Layer 3: Algorithms</div>
+            <div class="layer-meta">Four parallel matching algorithms compute similarity scores with detailed explanations</div>
             {layer3_html}
         </div>
 
         <div class="layer layer-4">
             <div class="layer-title">Layer 4: Combination</div>
+            <div class="layer-meta">Weighted average combines algorithm scores into unified match confidence</div>
             {layer4_html}
         </div>
 
         <div class="layer layer-5">
             <div class="layer-title">Layer 5: INCOSE Analysis</div>
+            <div class="layer-meta">Pattern matching against INCOSE requirement templates and structural analysis</div>
             {layer5_html}
         </div>
 
         <div class="layer layer-6">
             <div class="layer-title">Layer 6: Quality</div>
+            <div class="layer-meta">Multi-dimensional quality assessment across clarity, completeness, and verifiability</div>
             {layer6_html}
         </div>
 
         <div class="layer layer-7">
             <div class="layer-title">Layer 7: Final Decision</div>
+            <div class="layer-meta">Accept, review, or reject decision based on match confidence and quality</div>
             {layer7_html}
         </div>
     </div>
@@ -815,52 +922,133 @@ class TechnicalJourneyVisualizerHTML:
             score_color = self._get_score_color(score)
             percentage = self._get_score_percentage(score)
 
-            # Get explanation from the 'explanations' object
-            algo_explanation = 'No explanation'
+            # Get rich explanation details from the 'explanations' object
+            algo_explanation_html = ''
+
+            # Debug: check if we have explanations
+            if not explanations_obj:
+                algo_explanation_html = '<div style="font-size:0.6em;color:#999;font-style:italic;">No detailed explanation available</div>'
 
             if explanations_obj:
                 exp_data = explanations_obj.get(algo, '')
 
                 if algo == 'semantic':
-                    # Semantic is usually a string
+                    # Semantic: show analysis text
                     if isinstance(exp_data, str) and exp_data:
-                        algo_explanation = exp_data[:100]
-                    elif exp_data:
-                        algo_explanation = str(exp_data)[:100]
+                        algo_explanation_html = '<div style="font-size:0.65em;line-height:1.3;margin-top:3px;">'
+                        algo_explanation_html += f'<div style="background:#e3f2fd;padding:3px 5px;border-radius:2px;border:1px solid #2196f3;">{exp_data}</div>'
+                        algo_explanation_html += '<div style="margin-top:3px;color:#666;font-size:0.9em;">Uses sentence embeddings to measure contextual similarity between requirement and activity text.</div>'
+                        algo_explanation_html += '</div>'
 
                 elif algo == 'bm25':
-                    # BM25 might have shared terms
+                    # BM25: show explanation and matched terms
+                    if isinstance(exp_data, str) and exp_data:
+                        algo_explanation_html = f'<div style="font-size:0.65em;line-height:1.3;margin-top:3px;">'
+                        algo_explanation_html += f'<div style="background:#ffebee;padding:3px 5px;border-radius:2px;border:1px solid #e74c3c;">{exp_data}</div>'
+                        algo_explanation_html += '<div style="margin-top:3px;color:#666;font-size:0.9em;">Term frequency ranking algorithm - counts word overlaps weighted by importance.</div>'
+                        algo_explanation_html += '</div>'
+
+                    # Also show shared terms if available at top level
                     shared_terms = explanation.get('shared_terms', [])
-                    if shared_terms:
-                        algo_explanation = f"Matched: {', '.join(shared_terms[:4])}"
-                    elif isinstance(exp_data, str) and exp_data:
-                        algo_explanation = exp_data[:100]
+                    if shared_terms and not algo_explanation_html:
+                        req_terms = explanation.get('requirement_terms', [])
+                        overlap_pct = (len(shared_terms) / max(len(req_terms), 1)) * 100 if req_terms else 0
+                        algo_explanation_html = f'<div style="font-size:0.65em;line-height:1.3;margin-top:3px;">'
+                        algo_explanation_html += f'<div><strong>Term Overlap:</strong> {len(shared_terms)}/{len(req_terms)} terms ({overlap_pct:.0f}%)</div>'
+                        algo_explanation_html += '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px;">'
+                        for term in shared_terms[:8]:
+                            algo_explanation_html += f'<span style="background:#e1f5fe;padding:2px 5px;border-radius:3px;font-size:0.85em;border:1px solid #0288d1;">• {term}</span>'
+                        if len(shared_terms) > 8:
+                            algo_explanation_html += f'<span style="font-style:italic;color:#666;padding:2px;"> +{len(shared_terms)-8}</span>'
+                        algo_explanation_html += '</div></div>'
 
                 elif algo == 'domain':
-                    # Domain usually has aerospace_terms and activity_patterns
+                    # Domain: show aerospace terms, indicators, learned relationships, and bonus
                     if isinstance(exp_data, dict):
                         aero_terms = exp_data.get('aerospace_terms', [])
+                        indicators = exp_data.get('key_indicators', {})
+                        learned = exp_data.get('learned_relationships', {})
+                        bonus = exp_data.get('multi_evidence_bonus', 0)
+
+                        algo_explanation_html = '<div style="font-size:0.65em;line-height:1.3;margin-top:3px;">'
+
+                        # Aerospace terms - in 2 columns if more than 4
                         if aero_terms:
-                            algo_explanation = f"Aero terms: {', '.join(aero_terms[:3])}"
-                        else:
-                            algo_explanation = str(exp_data)[:100]
-                    elif exp_data:
-                        algo_explanation = str(exp_data)[:100]
+                            algo_explanation_html += f'<div style="margin-bottom:4px;"><strong>Aerospace Terms ({len(aero_terms)}):</strong></div>'
+                            if len(aero_terms) <= 4:
+                                for term in aero_terms[:4]:
+                                    algo_explanation_html += f'<div style="margin:1px 0;">• {term}</div>'
+                            else:
+                                algo_explanation_html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px;">'
+                                for term in aero_terms[:8]:
+                                    short_term = term[:12] + '...' if len(term) > 12 else term
+                                    algo_explanation_html += f'<div>• {short_term}</div>'
+                                algo_explanation_html += '</div>'
+                                if len(aero_terms) > 8:
+                                    algo_explanation_html += f'<div style="font-style:italic;color:#666;font-size:0.9em;">+{len(aero_terms)-8} more</div>'
+
+                        # Key indicators with weights
+                        if indicators:
+                            algo_explanation_html += '<div style="margin-top:5px;margin-bottom:3px;"><strong>Key Indicators:</strong></div>'
+                            for term, data in list(indicators.items())[:3]:
+                                weight = data.get('weight', 0)
+                                short_term = term[:15] + '...' if len(term) > 15 else term
+                                algo_explanation_html += f'<div style="margin:1px 0;">• {short_term} <span style="color:#666;font-size:0.9em;">(w={weight:.2f})</span></div>'
+                            if len(indicators) > 3:
+                                algo_explanation_html += f'<div style="font-style:italic;color:#666;font-size:0.9em;">+{len(indicators)-3} more</div>'
+
+                        # Learned relationships (patterns)
+                        if learned:
+                            algo_explanation_html += '<div style="margin-top:5px;margin-bottom:3px;"><strong>Learned Patterns:</strong></div>'
+                            for req_term, acts in list(learned.items())[:3]:
+                                short_req = req_term[:12] + '...' if len(req_term) > 12 else req_term
+                                short_acts = ', '.join(acts[:2])[:20]
+                                if len(acts) > 2:
+                                    short_acts += f'... (+{len(acts)-2})'
+                                algo_explanation_html += f'<div style="margin:1px 0;font-size:0.9em;">• {short_req} <span style="color:#3498db;">→</span> {short_acts}</div>'
+                            if len(learned) > 3:
+                                algo_explanation_html += f'<div style="font-style:italic;color:#666;font-size:0.9em;">+{len(learned)-3} more</div>'
+
+                        # Multi-evidence bonus
+                        if bonus > 0:
+                            algo_explanation_html += f'<div style="margin-top:5px;padding:2px 4px;background:#e8f5e9;border:1px solid #4caf50;border-radius:2px;text-align:center;"><strong style="color:#27ae60;">Multi-evidence: +{bonus:.2f}</strong></div>'
+
+                        algo_explanation_html += '</div>'
 
                 elif algo == 'query_expansion':
-                    # Query expansion has matched_terms
+                    # Query expansion: show matched and expanded terms with details
                     if isinstance(exp_data, dict):
+                        explanation_str = exp_data.get('explanation', '')
                         matched = exp_data.get('matched_terms', [])
-                        if matched:
-                            algo_explanation = f"Expanded: {', '.join(matched[:3])}"
-                        else:
-                            algo_explanation = str(exp_data)[:100]
-                    elif exp_data:
-                        algo_explanation = str(exp_data)[:100]
+                        expanded = exp_data.get('expanded_activity_terms', [])
 
-            # Truncate if needed
-            if len(algo_explanation) > 100:
-                algo_explanation = algo_explanation[:100] + "..."
+                        algo_explanation_html = '<div style="font-size:0.65em;line-height:1.3;margin-top:3px;">'
+
+                        # Show summary explanation
+                        if explanation_str:
+                            algo_explanation_html += f'<div style="background:#fff3e0;padding:3px 5px;border-radius:2px;border:1px solid #f39c12;">{explanation_str}</div>'
+
+                        if matched:
+                            algo_explanation_html += f'<div style="margin-top:3px;"><strong>Matched ({len(matched)}):</strong></div>'
+                            algo_explanation_html += '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px;">'
+                            for term in matched[:6]:
+                                algo_explanation_html += f'<span style="background:#fff3cd;padding:2px 4px;border-radius:2px;font-size:0.85em;border:1px solid #f39c12;">• {term}</span>'
+                            if len(matched) > 6:
+                                algo_explanation_html += f'<span style="font-style:italic;color:#666;padding:2px;"> +{len(matched)-6}</span>'
+                            algo_explanation_html += '</div>'
+
+                        if expanded:
+                            shown_expanded = [term for term in expanded[:8] if term not in matched]
+                            if shown_expanded:
+                                algo_explanation_html += f'<div style="margin-top:3px;"><strong>Expanded ({len(shown_expanded)}):</strong> '
+                                for term in shown_expanded:
+                                    short_term = term[:15] + '...' if len(term) > 15 else term
+                                    algo_explanation_html += f'<span style="color:#3498db;font-size:0.85em;">→{short_term}</span> '
+                                if len(expanded) > 8:
+                                    algo_explanation_html += f'<span style="font-style:italic;color:#666;">+{len(expanded)-8}</span>'
+                                algo_explanation_html += '</div>'
+
+                        algo_explanation_html += '</div>'
             
             algo_boxes_html += f"""
             <div class="algorithm-box" style="border-color: {color};">
@@ -869,7 +1057,7 @@ class TechnicalJourneyVisualizerHTML:
                 <div class="progress-bar">
                     <div class="progress-fill" style="width: {percentage}%; background-color: {color};"></div>
                 </div>
-                <div class="algo-details">{algo_explanation}</div>
+                <div class="algo-details">{algo_explanation_html}</div>
             </div>
             """
         
@@ -1135,27 +1323,15 @@ class TechnicalJourneyVisualizerHTML:
             }
             
             return f"""
-            <div class="decision-container">
-                <div class="decision-box" style="border-color: {color}; background-color: {color}20;">
-                    <div class="decision-symbol" style="color: {color};">{symbol}</div>
-                    <div class="decision-content">
-                        <div class="decision-title" style="color: {color};">{decision}</div>
-                        <div class="decision-action">{action}</div>
-                    </div>
-                </div>
-                
-                <div class="decision-metrics">
-                    <div class="metric-item">
-                        <span>Match Score:</span>
-                        <span style="color: {self._get_score_color(combined_score)};">{combined_score:.3f}</span>
-                    </div>
-                    <div class="metric-item">
-                        <span>Quality Grade:</span>
-                        <span style="color: {self._get_score_color(metrics.quality_score)};">{grade}</span>
-                    </div>
-                    <div class="metric-item">
-                        <span>Total Issues:</span>
-                        <span>{metrics.total_issues}</span>
+            <div style="display:flex;align-items:center;gap:8px;height:100%;">
+                <div style="flex:0 0 60px;text-align:center;font-size:2.5em;font-weight:bold;color:{color};">{symbol}</div>
+                <div style="flex:1;display:flex;flex-direction:column;gap:4px;">
+                    <div style="font-size:1em;font-weight:bold;color:{color};">{decision}</div>
+                    <div style="font-size:0.7em;color:#666;line-height:1.2;">{action}</div>
+                    <div style="display:flex;gap:12px;margin-top:2px;font-size:0.7em;">
+                        <span><strong>Match:</strong> <span style="color:{self._get_score_color(combined_score)};">{combined_score:.3f}</span></span>
+                        <span><strong>Quality:</strong> <span style="color:{self._get_score_color(metrics.quality_score)};">{grade}</span></span>
+                        <span><strong>Issues:</strong> {metrics.total_issues}</span>
                     </div>
                 </div>
             </div>
